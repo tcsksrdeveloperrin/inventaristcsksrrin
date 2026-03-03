@@ -309,7 +309,8 @@ USERS = {
 
 def login():
     st.title("☕ Login - Sistem Inventaris PT. Sari Tropis Indonesia")
-    st.subheader("Sistem Pencatatan & Dashboard Prediksi Stok Inventaris Bahan Baku dan Packaging")
+    st.subheader("Sistem Pencatatan & Dashboard Prediksi Stok Inventaris")
+    st.subheader("Bahan Baku dan Packaging")
     st.markdown("---")
     col1, col2, col3 = st.columns([1, 2, 1])
     with col2:
@@ -317,17 +318,17 @@ def login():
         with st.form("login_form"):
             username = st.text_input("Username")
             password = st.text_input("Password", type="password")
-            submit = st.form_submit_button("🔐 Masuk", use_container_width=True)
+            submit = st.form_submit_button("🔓 Masuk", use_container_width=True)
 
             if submit:
                 if username in USERS and USERS[username]["password"] == password:
                     st.session_state.logged_in = True
                     st.session_state.role = USERS[username]["role"]
                     st.session_state.cabang = USERS[username]["cabang"]
-                    st.success(f"✅ Berhasil login sebagai {st.session_state.role} - Cabang {st.session_state.cabang}")
+                    st.success(f"🟩 Berhasil login sebagai {st.session_state.role} - Cabang {st.session_state.cabang}")
                     st.rerun()
                 else:
-                    st.error("❌ Username atau Password salah!")
+                    st.error("🟥 Username atau Password salah!")
 
 def logout():
     st.session_state.logged_in = False
@@ -340,7 +341,7 @@ def logout():
 # 5. HALAMAN KASIR - Pencatatan Manual Non-POS
 # ==========================================
 def halaman_kasir():
-    st.header(f"🧑‍💻 Panel Kasir — Cabang {st.session_state.cabang}")
+    st.header(f"Panel Kasir — Cabang {st.session_state.cabang}")
     st.info(
         "Formulir ini digunakan untuk mencatat **penggunaan bahan baku di luar transaksi POS resmi**. "
         "Pengurangan stok akibat transaksi pembelian pelanggan sudah terjadi secara otomatis dari sistem POS."
@@ -723,4 +724,5 @@ def main():
 
 
 if __name__ == "__main__":
+
     main()
