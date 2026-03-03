@@ -173,8 +173,8 @@ def get_dummy_inventory(cabang="Buper"):
             ],
             "Merk": [
                 "Lokal", "Champ", "Bimoli", "Lokal",
-                "Kraft", "Siomay Merek A", "Mandailing", "—",
-                "Diamond", "Frisian Flag", "Homemade", "Homemade", "—", "Matcha JP",
+                "Kraft", "Siomay Merek A", "Mandailing", "",
+                "Diamond", "Frisian Flag", "Homemade", "Homemade", "", "Matcha JP",
                 "Gelas Plastik 16oz", "Gelas Kertas", "Kraft Box S", "Hdpe"
             ],
             "Kategori": [
@@ -205,9 +205,9 @@ def get_dummy_inventory(cabang="Buper"):
                 "2025-07-01"]*18,
             "Tanggal Kadaluwarsa": [
                 "2025-12-31", "2025-09-01", "2026-01-01", "2025-07-10",
-                "2025-11-01", "2025-09-15", "2026-03-01", "—",
+                "2025-11-01", "2025-09-15", "2026-03-01", "",
                 "2025-08-01", "2025-10-01", "2025-08-20", "2025-08-20",
-                "—", "2026-06-01",
+                "", "2026-06-01",
                 "2026-06-01", "2026-06-01", "2026-06-01", "2026-06-01"
             ],
             "Harga Beli (Rp)": [
@@ -230,9 +230,9 @@ def get_dummy_inventory(cabang="Buper"):
             "Merk": [
                 "Lokal", "Champ", "Mandailing",
                 "Diamond", "Homemade",
-                "Homemade", "—", "Matcha JP",
+                "Homemade", "", "Matcha JP",
                 "Gelas Plastik 16oz", "Gelas Kertas", "Kraft Box S", "Hdpe",
-                "—", "Frisian Flag"
+                "", "Frisian Flag"
             ],
             "Kategori": [
                 "Bahan Baku", "Bahan Baku", "Bahan Baku",
@@ -266,9 +266,9 @@ def get_dummy_inventory(cabang="Buper"):
             "Tanggal Kadaluwarsa": [
                 "2025-12-31", "2025-09-01", "2026-03-01",
                 "2025-08-01", "2025-08-20",
-                "2025-08-20", "—", "2026-06-01",
+                "2025-08-20", "", "2026-06-01",
                 "2026-06-01", "2026-06-01", "2026-06-01", "2026-06-01",
-                "—", "2025-10-01"
+                "", "2025-10-01"
             ],
             "Harga Beli (Rp)": [
                 15000, 25000, 120000,
@@ -340,7 +340,7 @@ def logout():
 # 5. HALAMAN KASIR - Pencatatan Manual Non-POS
 # ==========================================
 def halaman_kasir():
-    st.header(f"Panel Kasir — Cabang {st.session_state.cabang}")
+    st.header(f"Panel Kasir  Cabang {st.session_state.cabang}")
     st.info(
         "Formulir ini digunakan untuk mencatat **penggunaan bahan baku di luar transaksi POS resmi**. "
         "Pengurangan stok akibat transaksi pembelian pelanggan sudah terjadi secara otomatis dari sistem POS."
@@ -350,10 +350,10 @@ def halaman_kasir():
 
     with tab1:
         kategori_penggunaan = {
-            "Uji Coba Resep (Bahan Baku Saja — tanpa Packaging)": "bahan_only",
+            "Uji Coba Resep (Bahan Baku Saja  tanpa Packaging)": "bahan_only",
             "Foto/Konten Promosi Sosmed (Bahan Baku + Packaging)": "full",
             "Konsumsi Pribadi Barista (Bahan Baku + Packaging)": "full",
-            "Konsumsi Pribadi Barista (Packaging Saja — bahan tidak dari stok)": "packaging_only",
+            "Konsumsi Pribadi Barista (Packaging Saja  bahan tidak dari stok)": "packaging_only",
         }
 
         with st.form("form_penggunaan_manual"):
@@ -418,7 +418,7 @@ def halaman_kasir():
 # 6. HALAMAN MANAGER - Dashboard, Peringatan & Export
 # ==========================================
 def halaman_manager():
-    st.header(f"📊 Dashboard Manager — Cabang {st.session_state.cabang}")
+    st.header(f"📊 Dashboard Manager  Cabang {st.session_state.cabang}")
 
     data_inv = get_dummy_inventory(st.session_state.cabang)
     data_inv["Status"] = data_inv.apply(
@@ -485,7 +485,7 @@ def halaman_manager():
             st.error(f"**{len(darurat)} item** perlu restock SEGERA!")
             for _, row in darurat.iterrows():
                 st.error(
-                    f"🔴 **{row['Item']}** — Sisa: {row['Sisa Stok']} {row['Satuan']} "
+                    f"🔴 **{row['Item']}**  Sisa: {row['Sisa Stok']} {row['Satuan']} "
                     f"| Batas Aman: {row['Batas Aman']} | "
                     f"Prediksi Habis: {row['Prediksi Restock']}"
                 )
@@ -496,7 +496,7 @@ def halaman_manager():
             st.warning(f"**{len(hampir)} item** akan habis dalam 7 hari ke depan:")
             for _, row in hampir.iterrows():
                 st.warning(
-                    f"🟡 **{row['Item']}** — Estimasi habis: {row['Estimasi Habis (Hari)']} hari "
+                    f"🟡 **{row['Item']}**  Estimasi habis: {row['Estimasi Habis (Hari)']} hari "
                     f"({row['Prediksi Restock']})"
                 )
 
@@ -564,7 +564,7 @@ def halaman_manager():
 # ==========================================
 def halaman_owner_cabang():
     cabang = st.session_state.cabang
-    st.header(f"📈 Executive Dashboard — Cabang {cabang}")
+    st.header(f"📈 Executive Dashboard  Cabang {cabang}")
     st.write(f"Menampilkan data untuk cabang: **{cabang}**")
 
     data_inv = get_dummy_inventory(cabang)
@@ -599,12 +599,12 @@ def halaman_owner_cabang():
 # 8. HALAMAN OWNER PUSAT - Dashboard Multi-Cabang + Drill Down
 # ==========================================
 def halaman_owner_pusat():
-    st.header("🏢 Executive Dashboard — Owner Pusat")
+    st.header("🏢 Executive Dashboard  Owner Pusat")
     st.write("Pantau seluruh cabang kafe PT. Sari Tropis Indonesia dari satu layar.")
 
     # Drill down selector
     cabang_pilihan = st.selectbox(
-        "🔍 Drill Down — Pilih Cabang:",
+        "🔍 Drill Down  Pilih Cabang:",
         ["Semua Cabang", "Buper", "WKA"]
     )
 
@@ -639,7 +639,7 @@ def halaman_owner_pusat():
         df_agg = df_view.groupby(["Cabang", "Kategori"])["Sisa Stok"].sum().reset_index()
         fig1 = px.bar(
             df_agg, x="Kategori", y="Sisa Stok", color="Cabang",
-            barmode="group", title=f"Perbandingan Sisa Stok — {label_cabang}"
+            barmode="group", title=f"Perbandingan Sisa Stok  {label_cabang}"
         )
         st.plotly_chart(fig1, use_container_width=True)
 
@@ -649,12 +649,12 @@ def halaman_owner_pusat():
         df_nilai = df_view2.groupby(["Cabang", "Kategori"])["Nilai Stok (Rp)"].sum().reset_index()
         fig2 = px.bar(
             df_nilai, x="Kategori", y="Nilai Stok (Rp)", color="Cabang",
-            barmode="group", title=f"Estimasi Nilai Stok (per 1000 unit) — {label_cabang}"
+            barmode="group", title=f"Estimasi Nilai Stok (per 1000 unit)  {label_cabang}"
         )
         st.plotly_chart(fig2, use_container_width=True)
 
     with tab2:
-        st.subheader(f"Detail Stok — {label_cabang}")
+        st.subheader(f"Detail Stok  {label_cabang}")
         st.dataframe(
             df_view[["Cabang", "Item", "Kategori", "Sisa Stok", "Satuan", "Batas Aman", "Status"]],
             use_container_width=True
@@ -665,7 +665,7 @@ def halaman_owner_pusat():
         if not kritis.empty:
             st.error(f"⚠️ Ada **{len(kritis)} item** yang perlu restock di {label_cabang}:")
             for _, row in kritis.iterrows():
-                st.error(f"🔴 [{row['Cabang']}] {row['Item']} — Sisa: {row['Sisa Stok']} {row['Satuan']}")
+                st.error(f"🔴 [{row['Cabang']}] {row['Item']}  Sisa: {row['Sisa Stok']} {row['Satuan']}")
 
 
 # ==========================================
@@ -689,7 +689,7 @@ def tampilkan_sidebar():
         for t in transaksi_pos_dummy:
             if st.session_state.cabang == "Semua" or t["cabang"] == st.session_state.cabang:
                 st.caption(
-                    f"⏱ {t['waktu']} — **{t['item']}** x{t['qty']} [{t['cabang']}]\n"
+                    f"⏱ {t['waktu']}  **{t['item']}** x{t['qty']} [{t['cabang']}]\n"
                     f"↳ Stok otomatis terpotong via POS"
                 )
 
@@ -725,4 +725,5 @@ def main():
 if __name__ == "__main__":
 
     main()
+
 
