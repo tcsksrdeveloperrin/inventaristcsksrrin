@@ -768,8 +768,6 @@ def login():
                     st.rerun()
                 else:
                     st.error("❌ Username atau Password salah!")
-        st.caption("Akun demo: kasir_buper / manager_buper / owner_pusat | Password: 123")
-
 
 def logout():
     for key in ["logged_in", "role", "cabang", "log_transaksi_manual",
@@ -1336,3 +1334,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+
