@@ -309,8 +309,7 @@ USERS = {
 
 def login():
     st.title("☕ Login - Sistem Inventaris PT. Sari Tropis Indonesia")
-    st.subheader("Sistem Pencatatan & Dashboard Prediksi Stok Inventaris")
-    st.subheader("Bahan Baku dan Packaging")
+    st.subheader("Sistem Pencatatan & Dashboard Prediksi Stok Inventaris Bahan Baku dan Packaging")
     st.markdown("---")
     col1, col2, col3 = st.columns([1, 2, 1])
     with col2:
@@ -726,3 +725,4 @@ def main():
 if __name__ == "__main__":
 
     main()
+
