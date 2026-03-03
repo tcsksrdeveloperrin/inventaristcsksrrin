@@ -774,7 +774,7 @@ def logout():
 # ==========================================
 
 def halaman_kasir():
-    st.header(f"🧑‍💻 Panel Kasir  Cabang {st.session_state.cabang}")
+    st.header(f"Panel Kasir  Cabang {st.session_state.cabang}")
     st.info(
         "Formulir ini untuk mencatat **penggunaan bahan baku di luar transaksi POS resmi**. "
         "Pengurangan stok dari transaksi pelanggan sudah otomatis terjadi via sinkronisasi POS."
@@ -1145,7 +1145,7 @@ def halaman_manager():
 
 def halaman_owner_cabang():
     cabang = st.session_state.cabang
-    st.header(f"📈 Executive Dashboard  Cabang {cabang}")
+    st.header(f"Executive Dashboard  Cabang {cabang}")
 
     data_inv = load_inventory(cabang)
     df_logs = load_logs(cabang)
@@ -1189,7 +1189,7 @@ def halaman_owner_cabang():
 # ==========================================
 
 def halaman_owner_pusat():
-    st.header("🏢 Executive Dashboard  Owner Pusat")
+    st.header("Executive Dashboard  Owner Pusat")
     st.write("Pantau seluruh cabang kafe PT. Sari Tropis Indonesia dari satu layar.")
 
     cabang_pilihan = st.selectbox("🔍 Drill Down  Pilih Cabang:", ["Semua Cabang", "Buper", "WKA"])
@@ -1327,3 +1327,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+
