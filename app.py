@@ -33,18 +33,11 @@ st.set_page_config(
 )
 
 # Kredensial diambil dari secrets.toml (Streamlit Cloud) atau environment
-try:
-    SUPABASE_INV_URL = st.secrets["SUPABASE_INV_URL"]
-    SUPABASE_INV_KEY = st.secrets["SUPABASE_INV_KEY"]
-    SUPABASE_POS_URL = st.secrets["SUPABASE_POS_URL"]
-    SUPABASE_POS_KEY = st.secrets["SUPABASE_POS_KEY"]
-except Exception:
-    # Fallback untuk development lokal
-    SUPABASE_INV_URL = "https://psvkisbwzikhjsatdgjr.supabase.co"
-    SUPABASE_INV_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBzdmtpc2J3emlraGpzYXRkZ2pyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzIxODIxNjAsImV4cCI6MjA4Nzc1ODE2MH0.2_gKwcctMt6Lf7Ay8M1oSYHK1uQzgcTd_M7vYFpYwFI"
-    SUPABASE_POS_URL = "https://wmtgotkjwmaxqxljcnrr.supabase.co"
-    SUPABASE_POS_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndtdGdvdGtqd21heHF4bGpjbnJyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTk5Mzc0NTEsImV4cCI6MjA3NTUxMzQ1MX0.vw_u2QroJXy3zCpAfQstgYYmlVMYocadfLmHIfg2uIs"
+SUPABASE_INV_URL = st.secrets["SUPABASE_INV_URL"]
+SUPABASE_INV_KEY = st.secrets["SUPABASE_INV_KEY"]
 
+SUPABASE_POS_URL = st.secrets["SUPABASE_POS_URL"]
+SUPABASE_POS_KEY = st.secrets["SUPABASE_POS_KEY"]
 
 # ===========================================================================
 # SUPABASE SCHEMA REFERENCE
@@ -551,8 +544,8 @@ def get_dummy_inventory(cabang: str = "Buper") -> pd.DataFrame:
             ],
             "Merk": [
                 "Lokal", "Champ", "Bimoli", "Lokal",
-                "Kraft", "Siomay Merek A", "Mandailing", "—",
-                "Diamond", "Frisian Flag", "Homemade", "Homemade", "—", "Matcha JP",
+                "Kraft", "Siomay Merek A", "Mandailing", "",
+                "Diamond", "Frisian Flag", "Homemade", "Homemade", "", "Matcha JP",
                 "Gelas Plastik 16oz", "Gelas Kertas", "Kraft Box S", "Hdpe"
             ],
             "Kategori": [
@@ -582,9 +575,9 @@ def get_dummy_inventory(cabang: str = "Buper") -> pd.DataFrame:
             "Tanggal Beli": ["2025-07-01"] * 18,
             "Tanggal Kadaluwarsa": [
                 "2025-12-31", "2025-09-01", "2026-01-01", "2025-07-10",
-                "2025-11-01", "2025-09-15", "2026-03-01", "—",
+                "2025-11-01", "2025-09-15", "2026-03-01", "",
                 "2025-08-01", "2025-10-01", "2025-08-20", "2025-08-20",
-                "—", "2026-06-01",
+                "", "2026-06-01",
                 "2026-06-01", "2026-06-01", "2026-06-01", "2026-06-01"
             ],
             "Harga Beli (Rp)": [
@@ -607,9 +600,9 @@ def get_dummy_inventory(cabang: str = "Buper") -> pd.DataFrame:
             "Merk": [
                 "Lokal", "Champ", "Mandailing",
                 "Diamond", "Homemade",
-                "Homemade", "—", "Matcha JP",
+                "Homemade", "", "Matcha JP",
                 "Gelas Plastik 16oz", "Gelas Kertas", "Kraft Box S", "Hdpe",
-                "—", "Frisian Flag"
+                "", "Frisian Flag"
             ],
             "Kategori": [
                 "Bahan Baku", "Bahan Baku", "Bahan Baku",
@@ -643,9 +636,9 @@ def get_dummy_inventory(cabang: str = "Buper") -> pd.DataFrame:
             "Tanggal Kadaluwarsa": [
                 "2025-12-31", "2025-09-01", "2026-03-01",
                 "2025-08-01", "2025-08-20",
-                "2025-08-20", "—", "2026-06-01",
+                "2025-08-20", "", "2026-06-01",
                 "2026-06-01", "2026-06-01", "2026-06-01", "2026-06-01",
-                "—", "2025-10-01"
+                "", "2025-10-01"
             ],
             "Harga Beli (Rp)": [
                 15000, 25000, 120000,
@@ -781,7 +774,7 @@ def logout():
 # ==========================================
 
 def halaman_kasir():
-    st.header(f"🧑‍💻 Panel Kasir — Cabang {st.session_state.cabang}")
+    st.header(f"🧑‍💻 Panel Kasir  Cabang {st.session_state.cabang}")
     st.info(
         "Formulir ini untuk mencatat **penggunaan bahan baku di luar transaksi POS resmi**. "
         "Pengurangan stok dari transaksi pelanggan sudah otomatis terjadi via sinkronisasi POS."
@@ -796,10 +789,10 @@ def halaman_kasir():
     # ── Tab 1: Input Manual ──────────────────────────────────────
     with tab1:
         KATEGORI_MAP = {
-            "Uji Coba Resep (Bahan Baku Saja — tanpa Packaging)": "bahan_only",
+            "Uji Coba Resep (Bahan Baku Saja  tanpa Packaging)": "bahan_only",
             "Foto/Konten Promosi Sosmed (Bahan Baku + Packaging)": "full",
             "Konsumsi Pribadi Barista (Bahan Baku + Packaging)": "full",
-            "Konsumsi Pribadi Barista (Packaging Saja — bahan tidak dari stok)": "packaging_only",
+            "Konsumsi Pribadi Barista (Packaging Saja  bahan tidak dari stok)": "packaging_only",
         }
 
         with st.form("form_penggunaan_manual"):
@@ -863,7 +856,7 @@ def halaman_kasir():
 
                 st.success("✅ Berhasil dicatat! Stok berikut telah dikurangi:")
                 df_potong = pd.DataFrame([
-                    {"Bahan / Packaging": k, "Jumlah Dikurangi": v, "Satuan": k.split("(")[-1].rstrip(")") if "(" in k else "—"}
+                    {"Bahan / Packaging": k, "Jumlah Dikurangi": v, "Satuan": k.split("(")[-1].rstrip(")") if "(" in k else ""}
                     for k, v in stok_dipotong.items()
                 ])
                 st.dataframe(df_potong, use_container_width=True)
@@ -911,7 +904,7 @@ def halaman_kasir():
 
         st.json(pos_dummy)
 
-        if st.button("▶️ Jalankan Sync (Dry Run — tidak tulis ke DB)", use_container_width=True):
+        if st.button("▶️ Jalankan Sync (Dry Run  tidak tulis ke DB)", use_container_width=True):
             hasil = sync_pos_to_inventory(pos_dummy, st.session_state.cabang, dry_run=True)
             st.session_state.pos_sync_results = hasil
             st.session_state.last_pos_sync = datetime.now().strftime("%H:%M:%S")
@@ -932,7 +925,7 @@ def halaman_kasir():
 # ==========================================
 
 def halaman_manager():
-    st.header(f"📊 Dashboard Manager — Cabang {st.session_state.cabang}")
+    st.header(f"📊 Dashboard Manager  Cabang {st.session_state.cabang}")
 
     # Parameter prediksi (bisa diatur oleh Manager)
     with st.expander("⚙️ Pengaturan Parameter Prediksi"):
@@ -1020,7 +1013,7 @@ def halaman_manager():
                 fn_color(f"**{len(subset)} item** dengan status '{status_label}':")
                 for _, row in subset.iterrows():
                     fn_color(
-                        f"{status_label} **{row['Item']}** — "
+                        f"{status_label} **{row['Item']}**  "
                         f"Sisa: {row['Sisa Stok']} {row['Satuan']} | "
                         f"ROP: {row['ROP']} | ADU: {row['ADU (per hari)']}/hari | "
                         f"Habis: {row['Prediksi Habis']} | Restock: {row['Tanggal Restock']}"
@@ -1031,7 +1024,7 @@ def halaman_manager():
 
     # ── Tab 3: FEFO ───────────────────────────────────────────────
     with tab3:
-        st.subheader(f"🏷️ FEFO — Item Kadaluwarsa dalam {fefo_days} Hari ke Depan")
+        st.subheader(f"🏷️ FEFO  Item Kadaluwarsa dalam {fefo_days} Hari ke Depan")
         st.caption("First Expired First Out: prioritaskan penggunaan bahan yang lebih cepat kedaluwarsa.")
 
         fefo_alerts = check_fefo_alerts(data_inv, fefo_days)
@@ -1040,11 +1033,11 @@ def halaman_manager():
                 exp_date = row["Tanggal Kadaluwarsa"]
                 days_left = (pd.to_datetime(exp_date) - datetime.now()).days
                 if days_left <= 0:
-                    st.error(f"🔴 **{row['Item']}** — SUDAH KADALUWARSA ({exp_date})")
+                    st.error(f"🔴 **{row['Item']}**  SUDAH KADALUWARSA ({exp_date})")
                 elif days_left <= 3:
-                    st.error(f"🟠 **{row['Item']}** — Kadaluwarsa {days_left} hari lagi ({exp_date})")
+                    st.error(f"🟠 **{row['Item']}**  Kadaluwarsa {days_left} hari lagi ({exp_date})")
                 else:
-                    st.warning(f"🟡 **{row['Item']}** — Kadaluwarsa {days_left} hari lagi ({exp_date})")
+                    st.warning(f"🟡 **{row['Item']}**  Kadaluwarsa {days_left} hari lagi ({exp_date})")
         else:
             st.success(f"✅ Tidak ada item yang akan kadaluwarsa dalam {fefo_days} hari ke depan.")
 
@@ -1152,7 +1145,7 @@ def halaman_manager():
 
 def halaman_owner_cabang():
     cabang = st.session_state.cabang
-    st.header(f"📈 Executive Dashboard — Cabang {cabang}")
+    st.header(f"📈 Executive Dashboard  Cabang {cabang}")
 
     data_inv = load_inventory(cabang)
     df_logs = load_logs(cabang)
@@ -1169,7 +1162,7 @@ def halaman_owner_cabang():
     fig = go.Figure()
     fig.add_trace(go.Bar(name="Sisa Stok", x=data_inv["Item"], y=data_inv["Sisa Stok"], marker_color="steelblue"))
     fig.add_trace(go.Bar(name="Batas Aman", x=data_inv["Item"], y=data_inv["Batas Aman"], marker_color="salmon"))
-    fig.update_layout(barmode="group", xaxis_tickangle=-45, title=f"Status Stok — Cabang {cabang}", height=450)
+    fig.update_layout(barmode="group", xaxis_tickangle=-45, title=f"Status Stok  Cabang {cabang}", height=450)
     st.plotly_chart(fig, use_container_width=True)
 
     col_g1, col_g2 = st.columns(2)
@@ -1196,10 +1189,10 @@ def halaman_owner_cabang():
 # ==========================================
 
 def halaman_owner_pusat():
-    st.header("🏢 Executive Dashboard — Owner Pusat")
+    st.header("🏢 Executive Dashboard  Owner Pusat")
     st.write("Pantau seluruh cabang kafe PT. Sari Tropis Indonesia dari satu layar.")
 
-    cabang_pilihan = st.selectbox("🔍 Drill Down — Pilih Cabang:", ["Semua Cabang", "Buper", "WKA"])
+    cabang_pilihan = st.selectbox("🔍 Drill Down  Pilih Cabang:", ["Semua Cabang", "Buper", "WKA"])
 
     df_buper = load_inventory("Buper")
     df_wka = load_inventory("WKA")
@@ -1229,7 +1222,7 @@ def halaman_owner_pusat():
         # SQL equivalent: SELECT name, SUM(stock_quantity) FROM ingredients GROUP BY name, branch
         df_agg = df_view.groupby(["Cabang", "Kategori"])["Sisa Stok"].sum().reset_index()
         fig1 = px.bar(df_agg, x="Kategori", y="Sisa Stok", color="Cabang",
-                      barmode="group", title=f"Perbandingan Sisa Stok — {label}")
+                      barmode="group", title=f"Perbandingan Sisa Stok  {label}")
         st.plotly_chart(fig1, use_container_width=True)
 
         # Status distribution per cabang
@@ -1239,7 +1232,7 @@ def halaman_owner_pusat():
         st.plotly_chart(fig_s, use_container_width=True)
 
     with tab2:
-        st.subheader(f"Detail Stok — {label}")
+        st.subheader(f"Detail Stok  {label}")
         cols_detail = [c for c in [
             "Cabang", "Item", "Kategori", "Sisa Stok", "Satuan",
             "Batas Aman", "ROP", "Estimasi Habis (Hari)", "Prediksi Habis", "Status"
@@ -1252,7 +1245,7 @@ def halaman_owner_pusat():
             st.error(f"⚠️ **{len(kritis)} item** membutuhkan perhatian di {label}:")
             for _, row in kritis.iterrows():
                 st.error(
-                    f"🔴 [{row['Cabang']}] **{row['Item']}** — "
+                    f"🔴 [{row['Cabang']}] **{row['Item']}**  "
                     f"Sisa: {row['Sisa Stok']} {row['Satuan']} | {row['Status']}"
                 )
 
@@ -1262,7 +1255,7 @@ def halaman_owner_pusat():
         df_view2["Nilai Stok (Rp)"] = df_view2["Sisa Stok"] * df_view2["Harga Beli (Rp)"].fillna(0)
         df_nilai = df_view2.groupby(["Cabang", "Kategori"])["Nilai Stok (Rp)"].sum().reset_index()
         fig_nilai = px.bar(df_nilai, x="Kategori", y="Nilai Stok (Rp)", color="Cabang",
-                           barmode="group", title=f"Estimasi Nilai Stok (Rp) — {label}")
+                           barmode="group", title=f"Estimasi Nilai Stok (Rp)  {label}")
         st.plotly_chart(fig_nilai, use_container_width=True)
 
         # ROP comparison per cabang
@@ -1299,7 +1292,7 @@ def tampilkan_sidebar():
                 stok_info = get_pemotongan_stok(t["item"], t["qty"])
                 bahan_list = ", ".join([f"{k}: -{v}" for k, v in list(stok_info.items())[:2]])
                 st.caption(
-                    f"⏱ **{t['waktu']}** — {t['item']} ×{t['qty']} [{t['cabang']}]\n"
+                    f"⏱ **{t['waktu']}**  {t['item']} ×{t['qty']} [{t['cabang']}]\n"
                     f"↳ _{bahan_list}_"
                 )
 
@@ -1334,4 +1327,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-
