@@ -15,9 +15,9 @@ st.set_page_config(
 def init_supabase():
     try:
         from supabase import create_client
-        SUPABASE_URL = st.secrets["https://supabase.com/dashboard/project/psvkisbwzikhjsatdgjr"]
-        SUPABASE_KEY = st.secrets["eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBzdmtpc2J3emlraGpzYXRkZ2pyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzIxODIxNjAsImV4cCI6MjA4Nzc1ODE2MH0.2_gKwcctMt6Lf7Ay8M1oSYHK1uQzgcTd_M7vYFpYwFI"]
-        return create_client(SUPABASE_URL, SUPABASE_KEY)
+        url = st.secrets["SUPABASE_URL"]
+        key = st.secrets["SUPABASE_KEY"]
+        return create_client(url, key)
     except Exception:
         return None
 
@@ -226,7 +226,7 @@ def show_login():
             <div style='background:#fff7ed;border:1px solid #fed7aa;border-radius:8px;
                         padding:0.8rem 1rem;margin-top:1rem;font-size:0.82rem;color:#9a3412;'>
             ⚠️ <b>Supabase belum terhubung.</b><br>
-            Tambahkan <code>SUPABASE_URL</code> dan <code>SUPABASE_KEY</code>
+            Tambahkan <code>url</code> dan <code>key</code>
             di file <code>.streamlit/secrets.toml</code> untuk mengaktifkan login dan penyimpanan data.
             </div>
             """, unsafe_allow_html=True)
@@ -483,9 +483,9 @@ def page_administrasi(df: pd.DataFrame):
             with col_f1:
                 cari = st.text_input("🔍 Cari nama barang / supplier")
             with col_f2:
-                fil_kat = st.selectbox("Kategori", ["Semua"] + KATEGORI_OPTIONS, SUPABASE_KEY="r_kat")
+                fil_kat = st.selectbox("Kategori", ["Semua"] + KATEGORI_OPTIONS, key="r_kat")
             with col_f3:
-                fil_st  = st.selectbox("Status Bayar", ["Semua"] + STATUS_OPTIONS, SUPABASE_KEY="r_st")
+                fil_st  = st.selectbox("Status Bayar", ["Semua"] + STATUS_OPTIONS, key="r_st")
             with col_f4:
                 fil_bln = st.text_input("Bulan (YYYY-MM)", placeholder="Contoh: 2025-07")
 
@@ -616,7 +616,7 @@ def page_administrasi(df: pd.DataFrame):
                             f"dari **{row.get('supplier','-')}**. "
                             "Tindakan ini **tidak bisa dibatalkan**."
                         )
-                        konfirm = st.text_input('Ketik "HAPUS" untuk konfirmasi', SUPABASE_KEY="konfirm_hapus")
+                        konfirm = st.text_input('Ketik "HAPUS" untuk konfirmasi', key="konfirm_hapus")
                         if st.button("🗑️ Hapus Sekarang", type="primary"):
                             if konfirm.strip().upper() == "HAPUS":
                                 ok = delete_row(id_pilih)
@@ -728,7 +728,7 @@ def page_detail_stok(df: pd.DataFrame):
         st.subheader("📈 Tren Harga Satuan")
         if "nama_barang" in df.columns and not df.empty:
             barang_list = sorted(df["nama_barang"].dropna().unique().tolist())
-            pilih = st.selectbox("Pilih barang", barang_list, SUPABASE_KEY="tren_pilih")
+            pilih = st.selectbox("Pilih barang", barang_list, key="tren_pilih")
             tren = df[df["nama_barang"] == pilih][["tanggal","harga_satuan"]].copy()
             tren["tanggal"] = pd.to_datetime(tren["tanggal"], errors="coerce")
             tren = tren.dropna().sort_values("tanggal")
@@ -859,13 +859,13 @@ def page_kontrol_audit(df: pd.DataFrame):
 
         col_f1, col_f2, col_f3 = st.columns(3)
         with col_f1:
-            kat_f  = st.selectbox("Kategori", ["Semua"] + KATEGORI_OPTIONS, SUPABASE_KEY="log_kat")
+            kat_f  = st.selectbox("Kategori", ["Semua"] + KATEGORI_OPTIONS, key="log_kat")
         with col_f2:
             sort_f = st.selectbox("Urutkan berdasarkan",
                                   ["tanggal","total_harga","supplier","nama_barang"],
-                                  SUPABASE_KEY="log_sort")
+                                  key="log_sort")
         with col_f3:
-            asc_f  = st.selectbox("Urutan", ["Terbaru dulu","Terlama dulu"], SUPABASE_KEY="log_asc")
+            asc_f  = st.selectbox("Urutan", ["Terbaru dulu","Terlama dulu"], key="log_asc")
 
         log_df = df.copy()
         if kat_f != "Semua":
