@@ -15,9 +15,9 @@ st.set_page_config(
 def init_supabase():
     try:
         from supabase import create_client
-        url = st.secrets["https://supabase.com/dashboard/project/psvkisbwzikhjsatdgjr"]
-        key = st.secrets["eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBzdmtpc2J3emlraGpzYXRkZ2pyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzIxODIxNjAsImV4cCI6MjA4Nzc1ODE2MH0.2_gKwcctMt6Lf7Ay8M1oSYHK1uQzgcTd_M7vYFpYwFI"]
-        return create_client(url, key)
+        SUPABASE_URL = st.secrets["https://supabase.com/dashboard/project/psvkisbwzikhjsatdgjr"]
+        SUPABASE_KEY = st.secrets["eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBzdmtpc2J3emlraGpzYXRkZ2pyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzIxODIxNjAsImV4cCI6MjA4Nzc1ODE2MH0.2_gKwcctMt6Lf7Ay8M1oSYHK1uQzgcTd_M7vYFpYwFI"]
+        return create_client(SUPABASE_URL, SUPABASE_KEY)
     except Exception:
         return None
 
@@ -323,7 +323,7 @@ def page_dashboard(df: pd.DataFrame):
                          use_container_width=True, hide_index=True)
 
     st.markdown("---")
-    st.subheader("⚠️ Peringatan Kadaluarsa — 30 Hari ke Depan")
+    st.subheader("⚠️ Peringatan Kadaluarsa 30 Hari ke Depan")
     if "tgl_kadaluarsa" in df.columns:
         df_exp = df[
             df["tgl_kadaluarsa"].notna() &
@@ -346,7 +346,7 @@ def page_dashboard(df: pd.DataFrame):
 
 # ─── PAGE: ADMINISTRASI ───────────────────────────────────────────────────────────
 def page_administrasi(df: pd.DataFrame):
-    st.title("📋 Administrasi — Jejak Rekam Transaksi")
+    st.title("📋 Administrasi Jejak Rekam Transaksi")
 
     tab_catat, tab_riwayat, tab_kelola = st.tabs([
         "✏️ Catat Transaksi Baru",
@@ -361,7 +361,7 @@ def page_administrasi(df: pd.DataFrame):
 
         with st.form("form_catat", clear_on_submit=True):
 
-            st.markdown('<div class="form-section-title">📋 Seksi 1 — Administrasi</div>',
+            st.markdown('<div class="form-section-title">📋 Seksi 1 Administrasi</div>',
                         unsafe_allow_html=True)
             col1, col2, col3 = st.columns(3)
             with col1:
@@ -374,7 +374,7 @@ def page_administrasi(df: pd.DataFrame):
                                            placeholder="Contoh: Roastery A, Makmur Plastik")
 
             st.divider()
-            st.markdown('<div class="form-section-title">🏷️ Seksi 2 — Identitas Barang</div>',
+            st.markdown('<div class="form-section-title">🏷️ Seksi 2 Identitas Barang</div>',
                         unsafe_allow_html=True)
             col4, col5 = st.columns(2)
             with col4:
@@ -394,7 +394,7 @@ def page_administrasi(df: pd.DataFrame):
                 f_grind = st.selectbox("Grind Size (Khusus Kopi)", GRIND_OPTIONS)
 
             st.divider()
-            st.markdown('<div class="form-section-title">📦 Seksi 3 — Detail Stok & Harga</div>',
+            st.markdown('<div class="form-section-title">📦 Seksi 3 Detail Stok & Harga</div>',
                         unsafe_allow_html=True)
             col9, col10, col11 = st.columns(3)
             with col9:
@@ -418,7 +418,7 @@ def page_administrasi(df: pd.DataFrame):
             """, unsafe_allow_html=True)
 
             st.divider()
-            st.markdown('<div class="form-section-title">🔍 Seksi 4 — Kontrol & Audit</div>',
+            st.markdown('<div class="form-section-title">🔍 Seksi 4 Kontrol & Audit</div>',
                         unsafe_allow_html=True)
             col12, col13 = st.columns(2)
             with col12:
@@ -483,9 +483,9 @@ def page_administrasi(df: pd.DataFrame):
             with col_f1:
                 cari = st.text_input("🔍 Cari nama barang / supplier")
             with col_f2:
-                fil_kat = st.selectbox("Kategori", ["Semua"] + KATEGORI_OPTIONS, key="r_kat")
+                fil_kat = st.selectbox("Kategori", ["Semua"] + KATEGORI_OPTIONS, SUPABASE_KEY="r_kat")
             with col_f3:
-                fil_st  = st.selectbox("Status Bayar", ["Semua"] + STATUS_OPTIONS, key="r_st")
+                fil_st  = st.selectbox("Status Bayar", ["Semua"] + STATUS_OPTIONS, SUPABASE_KEY="r_st")
             with col_f4:
                 fil_bln = st.text_input("Bulan (YYYY-MM)", placeholder="Contoh: 2025-07")
 
@@ -528,7 +528,7 @@ def page_administrasi(df: pd.DataFrame):
                     id_pilih = st.selectbox(
                         "Pilih ID Transaksi",
                         df["id"].tolist(),
-                        format_func=lambda x: f"ID {x} — {df[df['id']==x]['nama_barang'].values[0] if not df[df['id']==x].empty else ''}"
+                        format_func=lambda x: f"ID {x} {df[df['id']==x]['nama_barang'].values[0] if not df[df['id']==x].empty else ''}"
                     )
 
                 baris = df[df["id"] == id_pilih]
@@ -616,7 +616,7 @@ def page_administrasi(df: pd.DataFrame):
                             f"dari **{row.get('supplier','-')}**. "
                             "Tindakan ini **tidak bisa dibatalkan**."
                         )
-                        konfirm = st.text_input('Ketik "HAPUS" untuk konfirmasi', key="konfirm_hapus")
+                        konfirm = st.text_input('Ketik "HAPUS" untuk konfirmasi', SUPABASE_KEY="konfirm_hapus")
                         if st.button("🗑️ Hapus Sekarang", type="primary"):
                             if konfirm.strip().upper() == "HAPUS":
                                 ok = delete_row(id_pilih)
@@ -628,7 +628,7 @@ def page_administrasi(df: pd.DataFrame):
 
 # ─── PAGE: IDENTITAS BARANG ───────────────────────────────────────────────────────
 def page_identitas(df: pd.DataFrame):
-    st.title("🏷️ Identitas Barang — Spesifikasi Produk")
+    st.title("🏷️ Identitas Barang Spesifikasi Produk")
 
     if df.empty:
         empty_state(
@@ -686,7 +686,7 @@ def page_identitas(df: pd.DataFrame):
 
 # ─── PAGE: DETAIL STOK ───────────────────────────────────────────────────────────
 def page_detail_stok(df: pd.DataFrame):
-    st.title("📦 Detail Stok — Kuantitas & Finansial")
+    st.title("📦 Detail Stok Kuantitas & Finansial")
 
     if df.empty:
         empty_state(
@@ -728,7 +728,7 @@ def page_detail_stok(df: pd.DataFrame):
         st.subheader("📈 Tren Harga Satuan")
         if "nama_barang" in df.columns and not df.empty:
             barang_list = sorted(df["nama_barang"].dropna().unique().tolist())
-            pilih = st.selectbox("Pilih barang", barang_list, key="tren_pilih")
+            pilih = st.selectbox("Pilih barang", barang_list, SUPABASE_KEY="tren_pilih")
             tren = df[df["nama_barang"] == pilih][["tanggal","harga_satuan"]].copy()
             tren["tanggal"] = pd.to_datetime(tren["tanggal"], errors="coerce")
             tren = tren.dropna().sort_values("tanggal")
@@ -753,7 +753,7 @@ def page_detail_stok(df: pd.DataFrame):
 
 # ─── PAGE: KONTROL & AUDIT ────────────────────────────────────────────────────────
 def page_kontrol_audit(df: pd.DataFrame):
-    st.title("🔍 Kontrol & Audit — Quality Control & Arus Kas")
+    st.title("🔍 Kontrol & Audit Quality Control & Arus Kas")
 
     if df.empty:
         empty_state(
@@ -806,7 +806,7 @@ def page_kontrol_audit(df: pd.DataFrame):
                 exp_cols = [c for c in exp_cols if c in df_exp.columns]
 
                 if not kritis.empty:
-                    st.error("🚨 Barang Kritis — Segera Pakai atau Retur ke Supplier!")
+                    st.error("🚨 Barang Kritis Segera Pakai atau Retur ke Supplier!")
                     st.dataframe(kritis[exp_cols].sort_values("tgl_kadaluarsa"),
                                  use_container_width=True, hide_index=True)
                 if not mendekat.empty:
@@ -859,13 +859,13 @@ def page_kontrol_audit(df: pd.DataFrame):
 
         col_f1, col_f2, col_f3 = st.columns(3)
         with col_f1:
-            kat_f  = st.selectbox("Kategori", ["Semua"] + KATEGORI_OPTIONS, key="log_kat")
+            kat_f  = st.selectbox("Kategori", ["Semua"] + KATEGORI_OPTIONS, SUPABASE_KEY="log_kat")
         with col_f2:
             sort_f = st.selectbox("Urutkan berdasarkan",
                                   ["tanggal","total_harga","supplier","nama_barang"],
-                                  key="log_sort")
+                                  SUPABASE_KEY="log_sort")
         with col_f3:
-            asc_f  = st.selectbox("Urutan", ["Terbaru dulu","Terlama dulu"], key="log_asc")
+            asc_f  = st.selectbox("Urutan", ["Terbaru dulu","Terlama dulu"], SUPABASE_KEY="log_asc")
 
         log_df = df.copy()
         if kat_f != "Semua":
