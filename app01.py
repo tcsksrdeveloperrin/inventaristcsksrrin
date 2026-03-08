@@ -665,100 +665,95 @@ def page_administrasi(df: pd.DataFrame):
         st.markdown("Isi form di bawah sesuai faktur / nota pembelian. Kolom bertanda **&ast;** wajib diisi.")
         st.markdown("")
 
+        # ── SEKSI 1: ADMINISTRASI (dalam form) ────────────────────────────────
+        st.markdown('<div class="form-section-title">📋 Seksi 1 — Administrasi</div>',
+                    unsafe_allow_html=True)
+        c1a, c1b, c1c = st.columns(3)
+        with c1a:
+            s1_tanggal  = st.date_input("Tanggal Transaksi *", value=date.today(), key="s1_tgl")
+        with c1b:
+            s1_nota     = st.text_input("Nomor Nota / Invoice", placeholder="Contoh: INV-001", key="s1_nota")
+        with c1c:
+            s1_supplier = st.text_input("Nama Supplier *", placeholder="Contoh: Roastery A, Makmur Plastik", key="s1_sup")
+
+        st.divider()
+
+        # ── SEKSI 2: IDENTITAS BARANG — DI LUAR FORM supaya drill-down reaktif ─
+        st.markdown('<div class="form-section-title">🏷️ Seksi 2 — Identitas Barang</div>',
+                    unsafe_allow_html=True)
+
+        # Baris 1: Kategori + Sub Kategori
+        c2a, c2b = st.columns(2)
+        with c2a:
+            s2_kategori = st.selectbox("Kategori *", KATEGORI_OPTIONS, key="s2_kategori")
+        with c2b:
+            sub_opts = SUB_KATEGORI_MAP.get(s2_kategori, ["Lainnya"])
+            s2_sub   = st.selectbox("Sub Kategori *", sub_opts, key="s2_sub")
+
+        # Baris 2: Nama Barang + Merk + Grind Size
+        c2c, c2d, c2e = st.columns(3)
+        with c2c:
+            nama_opts    = NAMA_BARANG_MAP.get((s2_kategori, s2_sub), ["Lainnya"])
+            s2_nama_sel  = st.selectbox(
+                "Nama Barang *", nama_opts, key="s2_nama_sel",
+                help="Pilih dari daftar atau 'Lainnya' untuk ketik manual"
+            )
+            if s2_nama_sel == "Lainnya":
+                s2_nama = st.text_input(
+                    "Ketik Nama Barang Baru *",
+                    placeholder="Masukkan nama barang baru",
+                    key="s2_nama_custom"
+                )
+            else:
+                s2_nama = s2_nama_sel
+
+        with c2d:
+            merk_presets = MERK_MAP.get(s2_nama_sel, None)
+            if merk_presets:
+                s2_merk_sel = st.selectbox(
+                    "Merk / Brand", merk_presets, key="s2_merk_sel",
+                    help="Pilih merk atau 'Lainnya' untuk ketik manual"
+                )
+                if s2_merk_sel == "Lainnya":
+                    s2_merk = st.text_input(
+                        "Ketik Merk / Brand Baru",
+                        placeholder="Masukkan merk baru",
+                        key="s2_merk_custom"
+                    )
+                else:
+                    s2_merk = s2_merk_sel
+            else:
+                s2_merk = st.text_input(
+                    "Merk / Brand",
+                    placeholder="Contoh: Diamond, Fiesta, Homemade",
+                    key="s2_merk_free"
+                )
+
+        with c2e:
+            if s2_kategori == "Bahan Baku Minuman" and s2_sub == "Coffee Beans":
+                s2_grind = st.selectbox("Grind Size (Khusus Kopi) *", GRIND_OPTIONS, key="s2_grind")
+            else:
+                s2_grind = "-"
+                st.selectbox(
+                    "Grind Size (Khusus Kopi)", ["-"], key="s2_grind_dis",
+                    disabled=True,
+                    help="Hanya aktif untuk sub kategori Coffee Beans"
+                )
+
+        # Info Digunakan di Menu — tampil langsung reaktif di sini (luar form)
+        digunakan = DIGUNAKAN_DI_MENU.get(s2_nama_sel, "") if s2_nama_sel != "Lainnya" else ""
+        if digunakan:
+            st.info(f"🍽️ **Digunakan di Menu:** {digunakan}")
+        else:
+            st.caption("ℹ️ Info menu akan muncul otomatis setelah nama barang dipilih.")
+
+        st.divider()
+
+        # ── SEKSI 3 & 4: dalam form (tidak perlu reaktif) ─────────────────────
+        st.markdown('<div class="form-section-title">📦 Seksi 3 — Detail Stok & Harga</div>',
+                    unsafe_allow_html=True)
+
         with st.form("form_catat", clear_on_submit=True):
-
-            # ── SEKSI 1: ADMINISTRASI ──────────────────────────────────────────
-            st.markdown('<div class="form-section-title">📋 Seksi 1 Administrasi</div>',
-                        unsafe_allow_html=True)
-            col1, col2, col3 = st.columns(3)
-            with col1:
-                f_tanggal  = st.date_input("Tanggal Transaksi *", value=date.today())
-            with col2:
-                f_nota     = st.text_input("Nomor Nota / Invoice",
-                                           placeholder="Contoh: INV-001")
-            with col3:
-                f_supplier = st.text_input("Nama Supplier *",
-                                           placeholder="Contoh: Roastery A, Makmur Plastik")
-
-            st.divider()
-
-            # ── SEKSI 2: IDENTITAS BARANG (drill-down) ─────────────────────────
-            st.markdown('<div class="form-section-title">🏷️ Seksi 2 Identitas Barang</div>',
-                        unsafe_allow_html=True)
-
-            # Pilih Kategori & Sub Kategori
-            col4, col5 = st.columns(2)
-            with col4:
-                f_kategori = st.selectbox("Kategori *", KATEGORI_OPTIONS, key="new_kategori")
-            with col5:
-                sub_options = SUB_KATEGORI_MAP.get(f_kategori, ["Lainnya"])
-                f_sub = st.selectbox("Sub Kategori *", sub_options, key="new_sub")
-
-            # Nama Barang (drill-down + Lainnya)
-            col6, col7, col8 = st.columns(3)
-            with col6:
-                nama_options = NAMA_BARANG_MAP.get((f_kategori, f_sub), ["Lainnya"])
-                f_nama_pilih = st.selectbox(
-                    "Nama Barang *", nama_options, key="new_nama_pilih",
-                    help="Pilih dari daftar atau pilih 'Lainnya' untuk input manual"
-                )
-                if f_nama_pilih == "Lainnya":
-                    f_nama = st.text_input(
-                        "Ketik Nama Barang Baru *",
-                        placeholder="Masukkan nama barang baru",
-                        key="new_nama_custom"
-                    )
-                else:
-                    f_nama = f_nama_pilih
-
-            # Merk/Brand
-            with col7:
-                merk_presets = MERK_MAP.get(f_nama_pilih, None)
-                if merk_presets:
-                    f_merk_pilih = st.selectbox(
-                        "Merk / Brand", merk_presets, key="new_merk_pilih",
-                        help="Pilih merk yang tersedia atau 'Lainnya' untuk input manual"
-                    )
-                    if f_merk_pilih == "Lainnya":
-                        f_merk = st.text_input(
-                            "Ketik Merk / Brand Baru",
-                            placeholder="Masukkan merk baru",
-                            key="new_merk_custom"
-                        )
-                    else:
-                        f_merk = f_merk_pilih
-                else:
-                    f_merk = st.text_input(
-                        "Merk / Brand",
-                        placeholder="Contoh: Diamond, Fiesta, Homemade",
-                        key="new_merk_free"
-                    )
-
-            # Grind Size
-            with col8:
-                if f_kategori == "Bahan Baku Minuman" and f_sub == "Coffee Beans":
-                    f_grind = st.selectbox("Grind Size (Khusus Kopi) *", GRIND_OPTIONS, key="new_grind")
-                else:
-                    f_grind = "-"
-                    st.selectbox(
-                        "Grind Size (Khusus Kopi)", ["-"], key="new_grind_dis",
-                        disabled=True,
-                        help="Hanya aktif untuk kategori Coffee Beans"
-                    )
-
-            # Info Digunakan di Menu (otomatis, di luar kolom supaya full-width)
-            digunakan = DIGUNAKAN_DI_MENU.get(f_nama_pilih, "") if f_nama_pilih != "Lainnya" else ""
-            if digunakan:
-                st.markdown(
-                    f'<div class="menu-info-box">🍽️ <b>Digunakan di Menu:</b> {digunakan}</div>',
-                    unsafe_allow_html=True
-                )
-
-            st.divider()
-
-            # ── SEKSI 3: DETAIL STOK & HARGA ──────────────────────────────────
-            st.markdown('<div class="form-section-title">📦 Seksi 3 Detail Stok & Harga</div>',
-                        unsafe_allow_html=True)
             col9, col10, col11 = st.columns(3)
             with col9:
                 f_qty   = st.number_input("Kuantitas (Qty) *",
@@ -773,17 +768,10 @@ def page_administrasi(df: pd.DataFrame):
                                           help="Harga per 1 satuan sesuai UoM")
 
             f_total = f_qty * f_harga
-            st.markdown(f"""
-            <div class="info-box">
-                💰 <b>Total Harga (otomatis):</b> Rp {f_total:,.0f}
-                &nbsp;·&nbsp; {f_qty} {f_uom} × Rp {f_harga:,.0f}
-            </div>
-            """, unsafe_allow_html=True)
+            st.info(f"💰 **Total Harga (otomatis):** Rp {f_total:,.0f}  ·  {f_qty} {f_uom} × Rp {f_harga:,.0f}")
 
             st.divider()
-
-            # ── SEKSI 4: KONTROL & AUDIT ───────────────────────────────────────
-            st.markdown('<div class="form-section-title">🔍 Seksi 4 Kontrol & Audit</div>',
+            st.markdown('<div class="form-section-title">🔍 Seksi 4 — Kontrol & Audit</div>',
                         unsafe_allow_html=True)
             col12, col13 = st.columns(2)
             with col12:
@@ -805,37 +793,41 @@ def page_administrasi(df: pd.DataFrame):
             )
 
         if submit:
-            # Resolve nama & merk final (handle "Lainnya" custom input)
-            nama_final = st.session_state.get("new_nama_custom", "").strip() if f_nama_pilih == "Lainnya" else f_nama_pilih
-            merk_presets = MERK_MAP.get(f_nama_pilih, None)
-            if merk_presets:
-                merk_pilih_val = st.session_state.get("new_merk_pilih", merk_presets[0])
-                if merk_pilih_val == "Lainnya":
-                    merk_final = st.session_state.get("new_merk_custom", "").strip() or "-"
+            # Ambil nilai Seksi 1 & 2 dari session_state (sudah tersimpan otomatis)
+            nama_final  = st.session_state.get("s2_nama_custom", "").strip() if s2_nama_sel == "Lainnya" else s2_nama_sel
+            merk_presets_final = MERK_MAP.get(s2_nama_sel, None)
+            if merk_presets_final:
+                merk_sel_val = st.session_state.get("s2_merk_sel", merk_presets_final[0])
+                if merk_sel_val == "Lainnya":
+                    merk_final = st.session_state.get("s2_merk_custom", "").strip() or "-"
                 else:
-                    merk_final = merk_pilih_val
+                    merk_final = merk_sel_val
             else:
-                merk_final = st.session_state.get("new_merk_free", "").strip() or "-"
+                merk_final = st.session_state.get("s2_merk_free", "").strip() or "-"
+
+            supplier_val = st.session_state.get("s1_sup", "").strip()
+            nota_val     = st.session_state.get("s1_nota", "").strip()
+            tgl_val      = st.session_state.get("s1_tgl", date.today())
 
             errors = []
-            if not f_supplier.strip():  errors.append("Nama Supplier")
-            if not nama_final:          errors.append("Nama Barang")
-            if f_qty <= 0:              errors.append("Kuantitas harus lebih dari 0")
-            if f_harga <= 0:            errors.append("Harga Satuan harus lebih dari 0")
+            if not supplier_val: errors.append("Nama Supplier")
+            if not nama_final:   errors.append("Nama Barang")
+            if f_qty <= 0:       errors.append("Kuantitas harus lebih dari 0")
+            if f_harga <= 0:     errors.append("Harga Satuan harus lebih dari 0")
 
             if errors:
                 st.error("❌ Harap lengkapi kolom berikut: " + " · ".join(errors))
             else:
                 ok = insert_row({
                     "cabang":            st.session_state.cabang,
-                    "tanggal":           f_tanggal.isoformat(),
-                    "no_nota":           f_nota.strip() or None,
-                    "supplier":          f_supplier.strip(),
-                    "kategori":          f_kategori,
-                    "sub_kategori":      f_sub,
+                    "tanggal":           tgl_val.isoformat(),
+                    "no_nota":           nota_val or None,
+                    "supplier":          supplier_val,
+                    "kategori":          st.session_state.get("s2_kategori", s2_kategori),
+                    "sub_kategori":      st.session_state.get("s2_sub", s2_sub),
                     "nama_barang":       nama_final,
                     "merk":              merk_final,
-                    "grind_size":        f_grind,
+                    "grind_size":        st.session_state.get("s2_grind", s2_grind) if s2_kategori == "Bahan Baku Minuman" and s2_sub == "Coffee Beans" else "-",
                     "qty":               float(f_qty),
                     "uom":               f_uom,
                     "harga_satuan":      int(f_harga),
@@ -845,7 +837,7 @@ def page_administrasi(df: pd.DataFrame):
                     "catatan":           f_catatan.strip() or None,
                 })
                 if ok:
-                    st.success(f"✅ Transaksi **{nama_final}** dari **{f_supplier.strip()}** berhasil dicatat!")
+                    st.success(f"✅ Transaksi **{nama_final}** dari **{supplier_val}** berhasil dicatat!")
                     st.balloons()
 
     # ── TAB: RIWAYAT ─────────────────────────────────────────────────────────────
