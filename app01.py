@@ -82,12 +82,173 @@ st.markdown("""
 KATEGORI_OPTIONS = ["Bahan Baku Minuman", "Bahan Baku Makanan", "Packaging"]
 
 SUB_KATEGORI_MAP = {
-    "Bahan Baku Minuman": ["Coffee Beans", "Dairy & Creamer", "Powder & Syrup", "Lainnya"],
-    "Bahan Baku Makanan": ["Protein", "Fresh & Produce", "Tepung & Kering", "Bumbu", "Lainnya"],
-    "Packaging":          ["Gelas & Tutup", "Sedotan", "Kantong Plastik", "Box Makanan", "Lainnya"],
+    "Bahan Baku Minuman": [
+        "Coffee Beans", "Dairy & Creamer", "Powder & Syrup",
+        "Fresh & Produce", "Air & Es Batu", "Lainnya",
+    ],
+    "Bahan Baku Makanan": [
+        "Adonan & Tepung", "Protein", "Fresh & Produce",
+        "Dairy & Topping", "Bumbu & Pelengkap", "Lainnya",
+    ],
+    "Packaging": [
+        "Gelas & Tutup", "Sedotan", "Kantong Plastik", "Box Makanan",
+        "Kertas & Tisu", "Alat Makan Sekali Pakai", "Label & Branding", "Lainnya",
+    ],
 }
 
-UOM_OPTIONS    = ["kg", "gram", "liter", "ml", "pcs", "pack", "dus", "botol", "karton", "lusin"]
+# ── Katalog nama barang per (kategori, sub_kategori) dari spreadsheet ─────────
+# Format: { (kategori, sub_kategori): [ (nama_barang, [merk...], menu_penggunaan) ] }
+KATALOG = {
+    ("Bahan Baku Minuman", "Coffee Beans"): [
+        ("Beans Natural",   ["— isi saat beli —", "Lainnya"],          "Kopi Tubruk, Vietnam Drip, Japanese, V60"),
+        ("Espresso Shot",   ["—", "Lainnya"],                          "Kopi Susu Gula Aren, Kopi Susu Klasik, Hazelnut, Coffee Latte, Americano"),
+    ],
+    ("Bahan Baku Minuman", "Dairy & Creamer"): [
+        ("Susu Full Cream",          ["Rich Milk", "Lainnya"],         "Kopi Susu series, Coffee Latte"),
+        ("Susu UHT Full Cream",      ["Diamond", "Lainnya"],           "Hazelnut Latte, Greentea Latte, Red Velvet, Chocolate Latte"),
+        ("SKM (Susu Kental Manis)",  ["Frisian Flag", "Indomilk", "Lainnya"], "Vietnam Drip, Greentea Latte"),
+        ("Creamer Cair / Krim Masak",["— isi saat beli —", "Lainnya"], "Kopi Susu series, Coffee Latte"),
+    ],
+    ("Bahan Baku Minuman", "Powder & Syrup"): [
+        ("Powder Hazelnut",              ["— isi saat beli —", "Lainnya"], "Hazelnut Latte"),
+        ("Powder Greentea / Matcha",     ["— isi saat beli —", "Lainnya"], "Greentea Latte"),
+        ("Powder Red Velvet",            ["— isi saat beli —", "Lainnya"], "Red Velvet Latte"),
+        ("Powder Chocolate / Coklat Bubuk", ["— isi saat beli —", "Lainnya"], "Chocolate Latte"),
+        ("Gula Aren / Aren Liquid",      ["— isi saat beli —", "Lainnya"], "Kopi Susu Gula Aren"),
+        ("Simple Syrup (Gula Cair)",     ["Homemade", "— isi saat beli —", "Lainnya"], "Coffee Latte, Lemonade, Lemon Tea, Es Teh Manis, Greentea Latte"),
+        ("Syrup Hazelnut",               ["Monin", "Torani", "— isi saat beli —", "Lainnya"], "Kopi Susu Hazelnut"),
+        ("Syrup Leci",                   ["Monin", "Torani", "— isi saat beli —", "Lainnya"], "Yakult Leci"),
+        ("Syrup Melon",                  ["Monin", "Torani", "— isi saat beli —", "Lainnya"], "Yakult Melon"),
+        ("Syrup Strawberry",             ["Monin", "Torani", "— isi saat beli —", "Lainnya"], "Yakult Strawberry"),
+    ],
+    ("Bahan Baku Minuman", "Fresh & Produce"): [
+        ("Lemon Segar",           ["—", "Lainnya"],                    "Lemonade, Lemon Tea"),
+        ("Teh Celup / Teh Bubuk", ["Sosro", "Tong Tji", "— isi saat beli —", "Lainnya"], "Lemon Tea, Es Teh Manis"),
+        ("Yakult",                ["Yakult", "Lainnya"],               "Yakult Leci, Yakult Melon, Yakult Strawberry"),
+    ],
+    ("Bahan Baku Minuman", "Air & Es Batu"): [
+        ("Air Mineral / Air Galon", ["Le Minerale", "Aqua", "— isi saat beli —", "Lainnya"], "Semua menu kopi & non-kopi"),
+        ("Es Batu Kristal / Batangan", ["—", "Lainnya"],               "Semua menu minuman dingin"),
+    ],
+    ("Bahan Baku Makanan", "Adonan & Tepung"): [
+        ("Adonan Surabi (Tepung Beras + Santan)", ["Homemade", "Lainnya"], "Semua varian Surabi"),
+        ("Beras Ketan",    ["— isi saat beli —", "Lainnya"],           "Ketan Mozarella"),
+        ("Tepung Terigu",  ["Segitiga Biru", "Cakra Kembar", "— isi saat beli —", "Lainnya"], "Risoles"),
+    ],
+    ("Bahan Baku Makanan", "Protein"): [
+        ("Ayam Fillet / Ayam Potong",       ["— isi saat beli —", "Lainnya"], "Ayam Rempah Komplit, Ayam Penyet, Ayam Serundeng, Capcay, Surabi Abon"),
+        ("Telur Ayam",                       ["—", "Lainnya"],               "Surabi Telor, Nasi Goreng series"),
+        ("Abon Sapi / Abon Ayam",            ["— isi saat beli —", "Lainnya"], "Surabi Abon"),
+        ("Sosis Ayam / Sosis Sapi",          ["Fiesta", "So Good", "— isi saat beli —", "Lainnya"], "Surabi Sosis, Sosis goreng"),
+        ("Seafood Mix (Cumi, Udang, dll)",   ["— isi saat beli —", "Lainnya"], "Nasi Goreng Sea Food"),
+        ("Daging Kambing",                   ["— isi saat beli —", "Lainnya"], "Nasi Goreng Kambing"),
+        ("Ikan Jambal Roti",                 ["— isi saat beli —", "Lainnya"], "Nasi Goreng Jambal"),
+        ("Pempek Original",                  ["— isi saat beli —", "Lainnya"], "Pempek Original"),
+        ("Pempek Kapal Selam",               ["— isi saat beli —", "Lainnya"], "Pempek Kapal Selam"),
+        ("Risoles",                          ["Homemade", "— isi saat beli —", "Lainnya"], "Risoles"),
+        ("Tahu Putih / Tahu Goreng",         ["—", "Lainnya"],               "Ayam Rempah Komplit, Ayam Penyet, Ayam Serundeng"),
+        ("Tempe",                            ["—", "Lainnya"],               "Ayam Rempah Komplit, Ayam Penyet, Ayam Serundeng"),
+        ("Oncom",                            ["—", "Lainnya"],               "Surabi Oncom"),
+        ("Bakso",                            ["— isi saat beli —", "Lainnya"], "Capcay"),
+    ],
+    ("Bahan Baku Makanan", "Fresh & Produce"): [
+        ("Beras (Nasi Putih)",               ["— isi saat beli —", "Lainnya"], "Ayam series, Nasi Goreng series"),
+        ("Kwetiau / Mie Kwetiau",            ["— isi saat beli —", "Lainnya"], "Kwetiau"),
+        ("Kol / Kubis",                      ["—", "Lainnya"],               "Ayam series, Capcay"),
+        ("Pisang Kepok / Cavendish",         ["—", "Lainnya"],               "Pisang Keju, Pisang Coklat"),
+        ("Kentang",                          ["—", "Lainnya"],               "Kentang goreng"),
+        ("Sayuran Capcay (Wortel, Sawi, Jagung muda, dll)", ["—", "Lainnya"], "Capcay, Kwetiau"),
+    ],
+    ("Bahan Baku Makanan", "Dairy & Topping"): [
+        ("Keju Cheddar",                     ["Kraft", "Prochiz", "— isi saat beli —", "Lainnya"], "Surabi Keju, Pisang Keju"),
+        ("Keju Mozarella",                   ["Kraft", "— isi saat beli —", "Lainnya"], "Ketan Mozarella"),
+        ("SKM (Susu Kental Manis)",          ["Frisian Flag", "Indomilk", "— isi saat beli —", "Lainnya"], "Surabi Susu, Pisang Keju, Pisang Coklat"),
+        ("Meses / Cokelat Serut",            ["Ceres", "— isi saat beli —", "Lainnya"], "Surabi Coklat, Pisang Coklat"),
+        ("Pasta Cokelat / Dark Chocolate",   ["— isi saat beli —", "Lainnya"], "Pisang Coklat"),
+    ],
+    ("Bahan Baku Makanan", "Bumbu & Pelengkap"): [
+        ("Bawang Merah & Bawang Putih",      ["—", "Lainnya"],               "Semua menu makanan berat"),
+        ("Bawang Goreng Crispy",             ["— isi saat beli —", "Lainnya"], "Ayam series, Nasi Goreng series"),
+        ("Sambal",                           ["Homemade", "— isi saat beli —", "Lainnya"], "Ayam series, Kentang"),
+        ("Saus Tomat",                       ["ABC", "Indofood", "— isi saat beli —", "Lainnya"], "Kentang, Sosis"),
+        ("Saus Hot / Saus Pedas",            ["ABC", "Indofood", "— isi saat beli —", "Lainnya"], "Kentang, Sosis"),
+        ("Cuko Pempek",                      ["Homemade", "— isi saat beli —", "Lainnya"], "Pempek Original, Pempek Kapal Selam"),
+        ("Serundeng Kelapa",                 ["Homemade", "— isi saat beli —", "Lainnya"], "Ayam Serundeng"),
+        ("Minyak Goreng",                    ["Bimoli", "Sunco", "— isi saat beli —", "Lainnya"], "Semua menu goreng"),
+        ("Garam, Gula Pasir, Kecap Manis, Merica", ["— isi saat beli —", "Lainnya"], "Bumbu semua masakan"),
+    ],
+    ("Packaging", "Gelas & Tutup"): [
+        ("Cup Paper 8oz Hot",                ["— isi saat beli —", "Lainnya"], "Kopi Tubruk, Americano Hot, dan semua minuman panas"),
+        ("Cup Paper 12oz Hot",               ["— isi saat beli —", "Lainnya"], "Minuman panas ukuran besar"),
+        ("Cold Cup Plastik 16oz",            ["— isi saat beli —", "Lainnya"], "Semua minuman es: Kopi Susu, Latte series, Yakult, Lemonade, dll"),
+        ("Cold Cup Plastik 22oz",            ["— isi saat beli —", "Lainnya"], "Minuman es ukuran besar"),
+        ("Tutup Flat Hot Cup",               ["— isi saat beli —", "Lainnya"], "Pasangan Cup Paper Hot"),
+        ("Tutup Dome Cold Cup",              ["— isi saat beli —", "Lainnya"], "Pasangan Cold Cup plastik"),
+        ("Gelas Plastik Shot / Yakult Cup",  ["— isi saat beli —", "Lainnya"], "Yakult series, espresso shot"),
+    ],
+    ("Packaging", "Sedotan"): [
+        ("Sedotan Bening Standar",           ["— isi saat beli —", "Lainnya"], "Semua minuman dingin"),
+        ("Sedotan Boba / Jumbo",             ["— isi saat beli —", "Lainnya"], "Menu dengan topping boba/jelly"),
+        ("Sedotan Kertas / Bambu",           ["— isi saat beli —", "Lainnya"], "Alternatif eco-friendly"),
+    ],
+    ("Packaging", "Kantong Plastik"): [
+        ("Kantong Kresek HD Putih / Bening", ["— isi saat beli —", "Lainnya"], "Bungkus takeaway semua menu"),
+        ("Kantong Plastik Besar 30x40cm",    ["— isi saat beli —", "Lainnya"], "Takeaway makanan berat, paket banyak"),
+        ("Plastik Klip / Zip Lock",          ["— isi saat beli —", "Lainnya"], "Penyimpanan bahan, kemasan kecil"),
+    ],
+    ("Packaging", "Box Makanan"): [
+        ("Nasi Box / Rice Box Kertas",       ["— isi saat beli —", "Lainnya"], "Nasi Goreng series, Ayam series — takeaway"),
+        ("Box Snack Kertas Kecil",           ["— isi saat beli —", "Lainnya"], "Pisang Keju/Coklat, Kentang, Sosis, Surabi takeaway"),
+        ("Tray Plastik PP (untuk Pempek)",   ["— isi saat beli —", "Lainnya"], "Pempek Original & Kapal Selam takeaway"),
+        ("Cup Plastik + Tutup (untuk Cuko)", ["— isi saat beli —", "Lainnya"], "Wadah saus cuko pempek"),
+    ],
+    ("Packaging", "Kertas & Tisu"): [
+        ("Tisu Makan / Tissue Napkin",       ["— isi saat beli —", "Lainnya"], "Meja pelanggan, semua menu"),
+        ("Tisu Dapur / Kitchen Towel Roll",  ["— isi saat beli —", "Lainnya"], "Area dapur untuk kebersihan"),
+        ("Kertas Roti / Parchment Paper",    ["— isi saat beli —", "Lainnya"], "Alas sajian surabi, cemilan"),
+        ("Kertas Nasi / Wax Paper",          ["— isi saat beli —", "Lainnya"], "Membungkus surabi, makanan takeaway"),
+    ],
+    ("Packaging", "Alat Makan Sekali Pakai"): [
+        ("Sendok Plastik Takeaway",          ["— isi saat beli —", "Lainnya"], "Semua menu makanan takeaway"),
+        ("Garpu Plastik Takeaway",           ["— isi saat beli —", "Lainnya"], "Pempek, Cemilan, Makanan berat takeaway"),
+        ("Tusuk Sate / Lidi Surabi",         ["— isi saat beli —", "Lainnya"], "Penyajian Surabi"),
+        ("Tusuk Gigi",                       ["— isi saat beli —", "Lainnya"], "Meja pelanggan"),
+    ],
+    ("Packaging", "Label & Branding"): [
+        ("Stiker Label Minuman (Logo + Nama)", ["Custom Print", "Lainnya"],  "Branding cup takeaway"),
+        ("Stiker Seal / Security Cup",         ["Custom Print", "Lainnya"],  "Segel tutup cup takeaway"),
+        ("Kertas Struk Thermal 80mm",          ["— isi saat beli —", "Lainnya"], "Printer kasir / nota transaksi"),
+    ],
+}
+
+def get_nama_list(kategori: str, sub_kategori: str) -> list[str]:
+    """Return daftar nama barang untuk (kategori, sub_kategori), diakhiri 'Lainnya'."""
+    items = KATALOG.get((kategori, sub_kategori), [])
+    names = [item[0] for item in items]
+    if "Lainnya" not in names:
+        names.append("Lainnya")
+    return names
+
+def get_merk_list(kategori: str, sub_kategori: str, nama_barang: str) -> list[str]:
+    """Return daftar merk untuk nama_barang tertentu, diakhiri 'Lainnya'."""
+    items = KATALOG.get((kategori, sub_kategori), [])
+    for item in items:
+        if item[0] == nama_barang:
+            merks = list(item[1])
+            if "Lainnya" not in merks:
+                merks.append("Lainnya")
+            return merks
+    return ["— isi saat beli —", "Lainnya"]
+
+def get_menu_penggunaan(kategori: str, sub_kategori: str, nama_barang: str) -> str:
+    """Return kolom 'digunakan di menu' otomatis dari katalog."""
+    items = KATALOG.get((kategori, sub_kategori), [])
+    for item in items:
+        if item[0] == nama_barang:
+            return item[2]
+    return ""
+
+UOM_OPTIONS    = ["kg", "gram", "liter", "ml", "pcs", "pack", "dus", "botol", "karton", "lusin", "roll", "lembar"]
 GRIND_OPTIONS  = ["-", "Whole Bean", "V60 (5-6)", "Vietnam Drip (3-4)", "Espresso (2-3)", "French Press (7-8)"]
 STATUS_OPTIONS = ["Lunas", "Tempo (Hutang)", "DP/Uang Muka"]
 
@@ -356,7 +517,7 @@ def page_administrasi(df: pd.DataFrame):
 
     # ── TAB: CATAT TRANSAKSI BARU ────────────────────────────────────────────────
     with tab_catat:
-        st.markdown("Isi form di bawah sesuai faktur / nota pembelian. Kolom bertanda **\*** wajib diisi.")
+        st.markdown("Isi form di bawah sesuai faktur / nota pembelian. Kolom bertanda * wajib diisi.")
         st.markdown("")
 
         with st.form("form_catat", clear_on_submit=True):
@@ -376,22 +537,61 @@ def page_administrasi(df: pd.DataFrame):
             st.divider()
             st.markdown('<div class="form-section-title">🏷️ Seksi 2 Identitas Barang</div>',
                         unsafe_allow_html=True)
+
+            # ── Kategori & Sub Kategori (drill-down level 1) ──────────────────
             col4, col5 = st.columns(2)
             with col4:
                 f_kategori = st.selectbox("Kategori *", KATEGORI_OPTIONS)
             with col5:
-                f_sub      = st.selectbox("Sub Kategori *",
-                                          SUB_KATEGORI_MAP.get(f_kategori, ["Lainnya"]))
+                f_sub = st.selectbox(
+                    "Sub Kategori *",
+                    SUB_KATEGORI_MAP.get(f_kategori, ["Lainnya"]),
+                )
 
+            # ── Nama Barang (drill-down level 2) ─────────────────────────────
             col6, col7, col8 = st.columns(3)
             with col6:
-                f_nama  = st.text_input("Nama Barang *",
-                                        placeholder="Contoh: Biji Kopi Arabika, Cup Paper 8oz Hot")
+                nama_list   = get_nama_list(f_kategori, f_sub)
+                pilih_nama  = st.selectbox("Nama Barang *", nama_list)
+                if pilih_nama == "Lainnya":
+                    f_nama = st.text_input(
+                        "Ketik Nama Barang Baru *",
+                        placeholder="Contoh: Biji Kopi Ethiopia Natural",
+                        key="nama_custom",
+                    )
+                else:
+                    f_nama = pilih_nama
+
+            # ── Merk / Brand (drill-down level 3, mengikuti nama barang) ─────
             with col7:
-                f_merk  = st.text_input("Merk / Brand",
-                                        placeholder="Contoh: Single Origin, Diamond, Fiesta")
+                merk_list  = get_merk_list(f_kategori, f_sub, pilih_nama)
+                pilih_merk = st.selectbox("Merk / Brand", merk_list)
+                if pilih_merk == "Lainnya":
+                    f_merk = st.text_input(
+                        "Ketik Merk / Brand Baru",
+                        placeholder="Contoh: Single Origin, Fiesta, ABC",
+                        key="merk_custom",
+                    )
+                elif pilih_merk in ("—", "— isi saat beli —", "Homemade / —"):
+                    f_merk = st.text_input(
+                        "Merk / Brand",
+                        placeholder="Ketik merk yang dibeli",
+                        key="merk_manual",
+                    )
+                else:
+                    f_merk = pilih_merk
+
+            # ── Grind Size (khusus Coffee Beans) ─────────────────────────────
             with col8:
                 f_grind = st.selectbox("Grind Size (Khusus Kopi)", GRIND_OPTIONS)
+
+            # ── Digunakan di Menu (otomatis dari katalog) ─────────────────────
+            menu_otomatis = get_menu_penggunaan(f_kategori, f_sub, pilih_nama)
+            if menu_otomatis:
+                st.markdown(
+                    f'<div class="info-box">📋 <b>Digunakan di Menu:</b> {menu_otomatis}</div>',
+                    unsafe_allow_html=True,
+                )
 
             st.divider()
             st.markdown('<div class="form-section-title">📦 Seksi 3 Detail Stok & Harga</div>',
@@ -442,7 +642,7 @@ def page_administrasi(df: pd.DataFrame):
         if submit:
             errors = []
             if not f_supplier.strip(): errors.append("Nama Supplier")
-            if not f_nama.strip():     errors.append("Nama Barang")
+            if not f_nama.strip():     errors.append("Nama Barang (ketik nama baru jika pilih 'Lainnya')")
             if f_qty <= 0:             errors.append("Kuantitas harus lebih dari 0")
             if f_harga <= 0:           errors.append("Harga Satuan harus lebih dari 0")
 
