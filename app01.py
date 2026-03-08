@@ -75,16 +75,229 @@ st.markdown("""
         font-size: 0.9rem;
         margin-top: 0.4rem;
     }
+    .menu-info-box {
+        background: linear-gradient(135deg, #10b98115, #059f6715);
+        border: 1px solid #10b98140;
+        border-radius: 10px;
+        padding: 0.6rem 1rem;
+        font-size: 0.85rem;
+        margin-top: 0.3rem;
+        color: #065f46;
+    }
 </style>
 """, unsafe_allow_html=True)
 
 # ─── KONSTANTA ───────────────────────────────────────────────────────────────────
 KATEGORI_OPTIONS = ["Bahan Baku Minuman", "Bahan Baku Makanan", "Packaging"]
 
+# Level 2: Sub Kategori per Kategori
 SUB_KATEGORI_MAP = {
-    "Bahan Baku Minuman": ["Coffee Beans", "Dairy & Creamer", "Powder & Syrup", "Fresh & Produce", "Air & Es Batu", "Lainnya"],
-    "Bahan Baku Makanan": ["Adonan & Tepung", "Protein", "Fresh & Produce", "Dairy & Topping", "Bumbu & Pelengkap", "Lainnya"],
-    "Packaging":          ["Gelas & Tutup", "Sedotan", "Kantong Plastik", "Box Makanan", "Kertas & Tisu", "Alat Makan Sekali Pakai", "Lainnya"],
+    "Bahan Baku Minuman": [
+        "Coffee Beans",
+        "Dairy & Creamer",
+        "Powder & Syrup",
+        "Fresh & Produce",
+        "Air & Es Batu",
+        "Lainnya",
+    ],
+    "Bahan Baku Makanan": [
+        "Adonan & Tepung",
+        "Protein",
+        "Fresh & Produce",
+        "Dairy & Topping",
+        "Bumbu & Pelengkap",
+        "Lainnya",
+    ],
+    "Packaging": [
+        "Gelas & Tutup",
+        "Sedotan",
+        "Kantong Plastik",
+        "Box Makanan",
+        "Kertas & Tisu",
+        "Alat Makan Sekali Pakai",
+        "Label & Branding",
+        "Lainnya",
+    ],
+}
+
+# Level 3: Nama Barang per (Kategori, Sub Kategori)
+NAMA_BARANG_MAP = {
+    ("Bahan Baku Minuman", "Coffee Beans"): [
+        "Beans Natural", "Espresso Shot", "Lainnya"
+    ],
+    ("Bahan Baku Minuman", "Dairy & Creamer"): [
+        "Susu Full Cream", "Susu UHT Full Cream", "SKM (Susu Kental Manis)",
+        "Creamer Cair / Krim Masak", "Lainnya"
+    ],
+    ("Bahan Baku Minuman", "Powder & Syrup"): [
+        "Powder Hazelnut", "Powder Greentea / Matcha", "Powder Red Velvet",
+        "Powder Chocolate / Coklat Bubuk", "Gula Aren / Aren Liquid",
+        "Simple Syrup (Gula Cair)", "Syrup Hazelnut", "Syrup Leci",
+        "Syrup Melon", "Syrup Strawberry", "Lainnya"
+    ],
+    ("Bahan Baku Minuman", "Fresh & Produce"): [
+        "Lemon Segar", "Teh Celup / Teh Bubuk", "Yakult", "Lainnya"
+    ],
+    ("Bahan Baku Minuman", "Air & Es Batu"): [
+        "Air Mineral / Air Galon", "Es Batu Kristal / Batangan", "Lainnya"
+    ],
+    ("Bahan Baku Makanan", "Adonan & Tepung"): [
+        "Adonan Surabi (Tepung Beras + Santan)", "Beras Ketan",
+        "Tepung Terigu", "Lainnya"
+    ],
+    ("Bahan Baku Makanan", "Protein"): [
+        "Ayam Fillet / Ayam Potong", "Telur Ayam", "Abon Sapi / Abon Ayam",
+        "Sosis Ayam / Sosis Sapi", "Seafood Mix (Cumi, Udang, dll)",
+        "Daging Kambing", "Ikan Jambal Roti", "Pempek Original",
+        "Pempek Kapal Selam", "Risoles", "Tahu Putih / Tahu Goreng",
+        "Tempe", "Oncom", "Bakso", "Lainnya"
+    ],
+    ("Bahan Baku Makanan", "Fresh & Produce"): [
+        "Beras (Nasi Putih)", "Kwetiau / Mie Kwetiau", "Kol / Kubis",
+        "Pisang Kepok / Cavendish", "Kentang",
+        "Sayuran Capcay (Wortel, Sawi, Jagung muda, dll)", "Lainnya"
+    ],
+    ("Bahan Baku Makanan", "Dairy & Topping"): [
+        "Keju Cheddar", "Keju Mozarella", "SKM (Susu Kental Manis)",
+        "Meses / Cokelat Serut", "Pasta Cokelat / Dark Chocolate", "Lainnya"
+    ],
+    ("Bahan Baku Makanan", "Bumbu & Pelengkap"): [
+        "Bawang Merah & Bawang Putih", "Bawang Goreng Crispy", "Sambal",
+        "Saus Tomat", "Saus Hot / Saus Pedas", "Cuko Pempek",
+        "Serundeng Kelapa", "Minyak Goreng",
+        "Garam, Gula Pasir, Kecap Manis, Merica", "Lainnya"
+    ],
+    ("Packaging", "Gelas & Tutup"): [
+        "Cup Paper 8oz Hot", "Cup Paper 12oz Hot", "Cold Cup Plastik 16oz",
+        "Cold Cup Plastik 22oz", "Tutup Flat Hot Cup", "Tutup Dome Cold Cup",
+        "Gelas Plastik Shot / Yakult Cup", "Lainnya"
+    ],
+    ("Packaging", "Sedotan"): [
+        "Sedotan Bening Standar", "Sedotan Boba / Jumbo",
+        "Sedotan Kertas / Bambu", "Lainnya"
+    ],
+    ("Packaging", "Kantong Plastik"): [
+        "Kantong Kresek HD Putih / Bening", "Kantong Plastik Besar 30x40cm",
+        "Plastik Klip / Zip Lock", "Lainnya"
+    ],
+    ("Packaging", "Box Makanan"): [
+        "Nasi Box / Rice Box Kertas", "Box Snack Kertas Kecil",
+        "Tray Plastik PP (untuk Pempek)", "Cup Plastik + Tutup (untuk Cuko)",
+        "Lainnya"
+    ],
+    ("Packaging", "Kertas & Tisu"): [
+        "Tisu Makan / Tissue Napkin", "Tisu Dapur / Kitchen Towel Roll",
+        "Kertas Roti / Parchment Paper", "Kertas Nasi / Wax Paper", "Lainnya"
+    ],
+    ("Packaging", "Alat Makan Sekali Pakai"): [
+        "Sendok Plastik Takeaway", "Garpu Plastik Takeaway",
+        "Tusuk Sate / Lidi Surabi", "Tusuk Gigi", "Lainnya"
+    ],
+    ("Packaging", "Label & Branding"): [
+        "Stiker Seal / Security Cup", "Kertas Struk Thermal 80mm", "Lainnya"
+    ],
+}
+
+# Merk/Brand default per nama barang (produk yang sudah punya merk tetap)
+MERK_MAP = {
+    "Susu Full Cream":                       ["Rich Milk", "Lainnya"],
+    "Susu UHT Full Cream":                   ["Diamond", "Lainnya"],
+    "Yakult":                                ["Yakult", "Lainnya"],
+    "Adonan Surabi (Tepung Beras + Santan)": ["Homemade", "Lainnya"],
+    "Simple Syrup (Gula Cair)":              ["Homemade", "Lainnya"],
+    "Risoles":                               ["Homemade", "Lainnya"],
+    "Sambal":                                ["Homemade", "Lainnya"],
+    "Cuko Pempek":                           ["Homemade", "Lainnya"],
+    "Serundeng Kelapa":                      ["Homemade", "Lainnya"],
+    "Stiker Seal / Security Cup":            ["Custom Print", "Lainnya"],
+}
+
+# Digunakan di menu per nama barang
+DIGUNAKAN_DI_MENU = {
+    "Beans Natural":                          "Kopi Tubruk, Vietnam Drip, Japanese, V60",
+    "Espresso Shot":                          "Kopi Susu Gula Aren, Kopi Susu Klasik, Hazelnut, Coffee Latte, Americano",
+    "Susu Full Cream":                        "Kopi Susu series, Coffee Latte",
+    "Susu UHT Full Cream":                    "Hazelnut Latte, Greentea Latte, Red Velvet, Chocolate Latte",
+    "SKM (Susu Kental Manis)":                "Vietnam Drip, Greentea Latte / Surabi Susu, Pisang Keju, Pisang Coklat",
+    "Creamer Cair / Krim Masak":              "Kopi Susu series, Coffee Latte",
+    "Powder Hazelnut":                        "Hazelnut Latte",
+    "Powder Greentea / Matcha":               "Greentea Latte",
+    "Powder Red Velvet":                      "Red Velvet Latte",
+    "Powder Chocolate / Coklat Bubuk":        "Chocolate Latte",
+    "Gula Aren / Aren Liquid":                "Kopi Susu Gula Aren",
+    "Simple Syrup (Gula Cair)":               "Coffee Latte, Lemonade, Lemon Tea, Es Teh Manis, Greentea Latte",
+    "Syrup Hazelnut":                         "Kopi Susu Hazelnut",
+    "Syrup Leci":                             "Yakult Leci",
+    "Syrup Melon":                            "Yakult Melon",
+    "Syrup Strawberry":                       "Yakult Strawberry",
+    "Lemon Segar":                            "Lemonade, Lemon Tea",
+    "Teh Celup / Teh Bubuk":                  "Lemon Tea, Es Teh Manis",
+    "Yakult":                                 "Yakult Leci, Yakult Melon, Yakult Strawberry",
+    "Air Mineral / Air Galon":                "Semua menu kopi & non-kopi",
+    "Es Batu Kristal / Batangan":             "Semua menu minuman dingin",
+    "Adonan Surabi (Tepung Beras + Santan)":  "Semua varian Surabi",
+    "Beras Ketan":                            "Ketan Mozarella",
+    "Tepung Terigu":                          "Risoles",
+    "Ayam Fillet / Ayam Potong":              "Ayam Rempah Komplit, Ayam Penyet, Ayam Serundeng, Capcay, Surabi Abon",
+    "Telur Ayam":                             "Surabi Telor, Nasi Goreng series",
+    "Abon Sapi / Abon Ayam":                  "Surabi Abon",
+    "Sosis Ayam / Sosis Sapi":                "Surabi Sosis, Sosis goreng",
+    "Seafood Mix (Cumi, Udang, dll)":         "Nasi Goreng Sea Food",
+    "Daging Kambing":                         "Nasi Goreng Kambing",
+    "Ikan Jambal Roti":                       "Nasi Goreng Jambal",
+    "Pempek Original":                        "Pempek Original",
+    "Pempek Kapal Selam":                     "Pempek Kapal Selam",
+    "Risoles":                                "Risoles",
+    "Tahu Putih / Tahu Goreng":               "Ayam Rempah Komplit, Ayam Penyet, Ayam Serundeng",
+    "Tempe":                                  "Ayam Rempah Komplit, Ayam Penyet, Ayam Serundeng",
+    "Oncom":                                  "Surabi Oncom",
+    "Bakso":                                  "Capcay",
+    "Beras (Nasi Putih)":                     "Ayam series, Nasi Goreng series",
+    "Kwetiau / Mie Kwetiau":                  "Kwetiau",
+    "Kol / Kubis":                            "Ayam series, Capcay",
+    "Pisang Kepok / Cavendish":               "Pisang Keju, Pisang Coklat",
+    "Kentang":                                "Kentang goreng",
+    "Sayuran Capcay (Wortel, Sawi, Jagung muda, dll)": "Capcay, Kwetiau",
+    "Keju Cheddar":                           "Surabi Keju, Pisang Keju",
+    "Keju Mozarella":                         "Ketan Mozarella",
+    "Meses / Cokelat Serut":                  "Surabi Coklat, Pisang Coklat",
+    "Pasta Cokelat / Dark Chocolate":         "Pisang Coklat",
+    "Bawang Merah & Bawang Putih":            "Semua menu makanan berat",
+    "Bawang Goreng Crispy":                   "Ayam series, Nasi Goreng series",
+    "Sambal":                                 "Ayam series, Kentang",
+    "Saus Tomat":                             "Kentang, Sosis",
+    "Saus Hot / Saus Pedas":                  "Kentang, Sosis",
+    "Cuko Pempek":                            "Pempek Original, Pempek Kapal Selam",
+    "Serundeng Kelapa":                       "Ayam Serundeng",
+    "Minyak Goreng":                          "Semua menu goreng",
+    "Garam, Gula Pasir, Kecap Manis, Merica": "Bumbu semua masakan",
+    "Cup Paper 8oz Hot":                      "Kopi Tubruk, Americano Hot, dan semua minuman panas",
+    "Cup Paper 12oz Hot":                     "Minuman panas ukuran besar",
+    "Cold Cup Plastik 16oz":                  "Semua minuman es: Kopi Susu, Latte series, Yakult, Lemonade, dll",
+    "Cold Cup Plastik 22oz":                  "Minuman es ukuran besar",
+    "Tutup Flat Hot Cup":                     "Pasangan Cup Paper Hot",
+    "Tutup Dome Cold Cup":                    "Pasangan Cold Cup plastik",
+    "Gelas Plastik Shot / Yakult Cup":        "Yakult series, espresso shot",
+    "Sedotan Bening Standar":                 "Semua minuman dingin",
+    "Sedotan Boba / Jumbo":                   "Menu dengan topping boba/jelly (jika ada)",
+    "Sedotan Kertas / Bambu":                 "Alternatif eco-friendly",
+    "Kantong Kresek HD Putih / Bening":       "Bungkus takeaway semua menu",
+    "Kantong Plastik Besar 30x40cm":          "Takeaway makanan berat, paket banyak",
+    "Plastik Klip / Zip Lock":                "Penyimpanan bahan, kemasan kecil",
+    "Nasi Box / Rice Box Kertas":             "Nasi Goreng series, Ayam series — takeaway",
+    "Box Snack Kertas Kecil":                 "Pisang Keju/Coklat, Kentang, Sosis, Surabi takeaway",
+    "Tray Plastik PP (untuk Pempek)":         "Pempek Original & Kapal Selam takeaway",
+    "Cup Plastik + Tutup (untuk Cuko)":       "Wadah saus cuko pempek",
+    "Tisu Makan / Tissue Napkin":             "Meja pelanggan, semua menu",
+    "Tisu Dapur / Kitchen Towel Roll":        "Area dapur untuk kebersihan",
+    "Kertas Roti / Parchment Paper":          "Alas sajian surabi, cemilan",
+    "Kertas Nasi / Wax Paper":                "Membungkus surabi, makanan takeaway",
+    "Sendok Plastik Takeaway":                "Semua menu makanan takeaway",
+    "Garpu Plastik Takeaway":                 "Pempek, Cemilan, Makanan berat takeaway",
+    "Tusuk Sate / Lidi Surabi":               "Penyajian Surabi",
+    "Tusuk Gigi":                             "Meja pelanggan",
+    "Stiker Seal / Security Cup":             "Segel tutup cup takeaway",
+    "Kertas Struk Thermal 80mm":              "Printer kasir / nota transaksi",
 }
 
 UOM_OPTIONS    = ["kg", "gram", "liter", "ml", "pcs", "pack", "dus", "botol", "karton", "lusin"]
@@ -105,7 +318,7 @@ def init_session():
         "role":       None,
         "cabang":     None,
         "username":   None,
-        "local_data": [],   # fallback in-memory jika Supabase belum terhubung
+        "local_data": [],
         "next_id":    1,
     }
     for k, v in defaults.items():
@@ -226,7 +439,8 @@ def show_login():
             <div style='background:#fff7ed;border:1px solid #fed7aa;border-radius:8px;
                         padding:0.8rem 1rem;margin-top:1rem;font-size:0.82rem;color:#9a3412;'>
             ⚠️ <b>Supabase belum terhubung.</b><br>
-            Tambahkan <code>url</code> dan <code>key</code> di file <code>.streamlit/secrets.toml</code> untuk mengaktifkan login dan penyimpanan data.
+            Tambahkan <code>url</code> dan <code>key</code>
+            di file <code>.streamlit/secrets.toml</code> untuk mengaktifkan login dan penyimpanan data.
             </div>
             """, unsafe_allow_html=True)
 
@@ -266,7 +480,7 @@ def show_sidebar():
 
         st.markdown("""
         <div style='margin-top:2rem;border-top:1px solid rgba(255,255,255,0.1);
-                     padding-top:1rem;'></div>
+                    padding-top:1rem;'></div>
         """, unsafe_allow_html=True)
         if st.button("🚪 Keluar", use_container_width=True):
             for k in list(st.session_state.keys()):
@@ -274,6 +488,99 @@ def show_sidebar():
             st.rerun()
 
     return page
+
+# ─── HELPER: SEKSI 2 IDENTITAS BARANG (drill-down) ───────────────────────────────
+def render_seksi2_identitas(prefix: str = ""):
+    """
+    Renders Seksi 2 form fields with full drill-down:
+      Kategori → Sub Kategori → Nama Barang (pilih / ketik baru)
+      Merk/Brand (pilih / ketik baru) → info Digunakan di Menu (otomatis)
+      Grind Size (khusus kopi)
+    Returns dict of values: kategori, sub_kategori, nama_barang, merk, grind_size, digunakan_di_menu
+    """
+    col4, col5 = st.columns(2)
+    with col4:
+        f_kategori = st.selectbox("Kategori *", KATEGORI_OPTIONS, key=f"{prefix}kategori")
+    with col5:
+        sub_options = SUB_KATEGORI_MAP.get(f_kategori, ["Lainnya"])
+        f_sub = st.selectbox("Sub Kategori *", sub_options, key=f"{prefix}sub_kategori")
+
+    # Nama Barang — drill-down dengan opsi "Lainnya" untuk input manual
+    nama_options = NAMA_BARANG_MAP.get((f_kategori, f_sub), ["Lainnya"])
+    col6, col7, col8 = st.columns(3)
+    with col6:
+        f_nama_pilih = st.selectbox(
+            "Nama Barang *",
+            nama_options,
+            key=f"{prefix}nama_pilih",
+            help="Pilih dari daftar atau pilih 'Lainnya' untuk input manual"
+        )
+        if f_nama_pilih == "Lainnya":
+            f_nama = st.text_input(
+                "Ketik Nama Barang Baru *",
+                placeholder="Masukkan nama barang baru",
+                key=f"{prefix}nama_custom"
+            )
+        else:
+            f_nama = f_nama_pilih
+
+    # Merk/Brand — produk tertentu punya preset, sisanya input bebas
+    with col7:
+        merk_presets = MERK_MAP.get(f_nama_pilih, None)
+        if merk_presets:
+            f_merk_pilih = st.selectbox(
+                "Merk / Brand",
+                merk_presets,
+                key=f"{prefix}merk_pilih",
+                help="Pilih merk yang tersedia atau pilih 'Lainnya' untuk input manual"
+            )
+            if f_merk_pilih == "Lainnya":
+                f_merk = st.text_input(
+                    "Ketik Merk / Brand Baru",
+                    placeholder="Masukkan merk baru",
+                    key=f"{prefix}merk_custom"
+                )
+            else:
+                f_merk = f_merk_pilih
+        else:
+            f_merk = st.text_input(
+                "Merk / Brand",
+                placeholder="Contoh: Diamond, Fiesta, Homemade",
+                key=f"{prefix}merk_free"
+            )
+
+    # Grind Size — khusus Coffee Beans
+    with col8:
+        if f_kategori == "Bahan Baku Minuman" and f_sub == "Coffee Beans":
+            f_grind = st.selectbox("Grind Size (Khusus Kopi) *", GRIND_OPTIONS, key=f"{prefix}grind")
+        else:
+            f_grind = "-"
+            st.selectbox(
+                "Grind Size (Khusus Kopi)",
+                ["-"],
+                key=f"{prefix}grind_disabled",
+                disabled=True,
+                help="Hanya aktif untuk kategori Coffee Beans"
+            )
+
+    # Digunakan di Menu — otomatis dari data
+    digunakan = DIGUNAKAN_DI_MENU.get(f_nama_pilih, "") if f_nama_pilih != "Lainnya" else ""
+    if digunakan:
+        st.markdown(
+            f'<div class="menu-info-box">🍽️ <b>Digunakan di Menu:</b> {digunakan}</div>',
+            unsafe_allow_html=True
+        )
+    elif f_nama_pilih == "Lainnya":
+        st.info("ℹ️ Info menu tidak tersedia untuk barang baru — bisa dicatat di kolom Catatan.", icon=None)
+
+    return {
+        "kategori":         f_kategori,
+        "sub_kategori":     f_sub,
+        "nama_barang":      f_nama,
+        "merk":             f_merk.strip() if f_merk else "-",
+        "grind_size":       f_grind,
+        "digunakan_di_menu": digunakan,
+    }
 
 # ─── PAGE: DASHBOARD ─────────────────────────────────────────────────────────────
 def page_dashboard(df: pd.DataFrame):
@@ -299,7 +606,7 @@ def page_dashboard(df: pd.DataFrame):
     c1, c2, c3, c4 = st.columns(4)
     with c1: st.metric("💸 Total Pengeluaran",      f"Rp {total_keluar:,.0f}")
     with c2: st.metric("📝 Jumlah Transaksi",         total_trx)
-    with c3: st.metric("✅ Lunas",                  f"{n_lunas} dari {total_trx}")
+    with c3: st.metric("✅ Lunas",                   f"{n_lunas} dari {total_trx}")
     with c4: st.metric("⏳ Total Hutang Supplier",   f"Rp {total_hutang:,.0f}")
 
     st.markdown("---")
@@ -355,11 +662,12 @@ def page_administrasi(df: pd.DataFrame):
 
     # ── TAB: CATAT TRANSAKSI BARU ────────────────────────────────────────────────
     with tab_catat:
-        st.markdown("Isi form di bawah sesuai faktur / nota pembelian. Kolom bertanda **\*** wajib diisi.")
+        st.markdown("Isi form di bawah sesuai faktur / nota pembelian. Kolom bertanda **&ast;** wajib diisi.")
         st.markdown("")
 
         with st.form("form_catat", clear_on_submit=True):
 
+            # ── SEKSI 1: ADMINISTRASI ──────────────────────────────────────────
             st.markdown('<div class="form-section-title">📋 Seksi 1 Administrasi</div>',
                         unsafe_allow_html=True)
             col1, col2, col3 = st.columns(3)
@@ -373,26 +681,82 @@ def page_administrasi(df: pd.DataFrame):
                                            placeholder="Contoh: Roastery A, Makmur Plastik")
 
             st.divider()
+
+            # ── SEKSI 2: IDENTITAS BARANG (drill-down) ─────────────────────────
             st.markdown('<div class="form-section-title">🏷️ Seksi 2 Identitas Barang</div>',
                         unsafe_allow_html=True)
+
+            # Pilih Kategori & Sub Kategori
             col4, col5 = st.columns(2)
             with col4:
-                f_kategori = st.selectbox("Kategori *", KATEGORI_OPTIONS)
+                f_kategori = st.selectbox("Kategori *", KATEGORI_OPTIONS, key="new_kategori")
             with col5:
-                f_sub      = st.selectbox("Sub Kategori *",
-                                          SUB_KATEGORI_MAP.get(f_kategori, ["Lainnya"]))
+                sub_options = SUB_KATEGORI_MAP.get(f_kategori, ["Lainnya"])
+                f_sub = st.selectbox("Sub Kategori *", sub_options, key="new_sub")
 
+            # Nama Barang (drill-down + Lainnya)
             col6, col7, col8 = st.columns(3)
             with col6:
-                f_nama  = st.text_input("Nama Barang *",
-                                        placeholder="Contoh: Biji Kopi Arabika, Cup Paper 8oz Hot")
+                nama_options = NAMA_BARANG_MAP.get((f_kategori, f_sub), ["Lainnya"])
+                f_nama_pilih = st.selectbox(
+                    "Nama Barang *", nama_options, key="new_nama_pilih",
+                    help="Pilih dari daftar atau pilih 'Lainnya' untuk input manual"
+                )
+                if f_nama_pilih == "Lainnya":
+                    f_nama = st.text_input(
+                        "Ketik Nama Barang Baru *",
+                        placeholder="Masukkan nama barang baru",
+                        key="new_nama_custom"
+                    )
+                else:
+                    f_nama = f_nama_pilih
+
+            # Merk/Brand
             with col7:
-                f_merk  = st.text_input("Merk / Brand",
-                                        placeholder="Contoh: Single Origin, Diamond, Fiesta")
+                merk_presets = MERK_MAP.get(f_nama_pilih, None)
+                if merk_presets:
+                    f_merk_pilih = st.selectbox(
+                        "Merk / Brand", merk_presets, key="new_merk_pilih",
+                        help="Pilih merk yang tersedia atau 'Lainnya' untuk input manual"
+                    )
+                    if f_merk_pilih == "Lainnya":
+                        f_merk = st.text_input(
+                            "Ketik Merk / Brand Baru",
+                            placeholder="Masukkan merk baru",
+                            key="new_merk_custom"
+                        )
+                    else:
+                        f_merk = f_merk_pilih
+                else:
+                    f_merk = st.text_input(
+                        "Merk / Brand",
+                        placeholder="Contoh: Diamond, Fiesta, Homemade",
+                        key="new_merk_free"
+                    )
+
+            # Grind Size
             with col8:
-                f_grind = st.selectbox("Grind Size (Khusus Kopi)", GRIND_OPTIONS)
+                if f_kategori == "Bahan Baku Minuman" and f_sub == "Coffee Beans":
+                    f_grind = st.selectbox("Grind Size (Khusus Kopi) *", GRIND_OPTIONS, key="new_grind")
+                else:
+                    f_grind = "-"
+                    st.selectbox(
+                        "Grind Size (Khusus Kopi)", ["-"], key="new_grind_dis",
+                        disabled=True,
+                        help="Hanya aktif untuk kategori Coffee Beans"
+                    )
+
+            # Info Digunakan di Menu (otomatis, di luar kolom supaya full-width)
+            digunakan = DIGUNAKAN_DI_MENU.get(f_nama_pilih, "") if f_nama_pilih != "Lainnya" else ""
+            if digunakan:
+                st.markdown(
+                    f'<div class="menu-info-box">🍽️ <b>Digunakan di Menu:</b> {digunakan}</div>',
+                    unsafe_allow_html=True
+                )
 
             st.divider()
+
+            # ── SEKSI 3: DETAIL STOK & HARGA ──────────────────────────────────
             st.markdown('<div class="form-section-title">📦 Seksi 3 Detail Stok & Harga</div>',
                         unsafe_allow_html=True)
             col9, col10, col11 = st.columns(3)
@@ -412,12 +776,13 @@ def page_administrasi(df: pd.DataFrame):
             st.markdown(f"""
             <div class="info-box">
                 💰 <b>Total Harga (otomatis):</b> Rp {f_total:,.0f}
-                &nbsp;·&nbsp;
-                {f_qty} {f_uom} × Rp {f_harga:,.0f}
+                &nbsp;·&nbsp; {f_qty} {f_uom} × Rp {f_harga:,.0f}
             </div>
             """, unsafe_allow_html=True)
 
             st.divider()
+
+            # ── SEKSI 4: KONTROL & AUDIT ───────────────────────────────────────
             st.markdown('<div class="form-section-title">🔍 Seksi 4 Kontrol & Audit</div>',
                         unsafe_allow_html=True)
             col12, col13 = st.columns(2)
@@ -440,11 +805,23 @@ def page_administrasi(df: pd.DataFrame):
             )
 
         if submit:
+            # Resolve nama & merk final (handle "Lainnya" custom input)
+            nama_final = st.session_state.get("new_nama_custom", "").strip() if f_nama_pilih == "Lainnya" else f_nama_pilih
+            merk_presets = MERK_MAP.get(f_nama_pilih, None)
+            if merk_presets:
+                merk_pilih_val = st.session_state.get("new_merk_pilih", merk_presets[0])
+                if merk_pilih_val == "Lainnya":
+                    merk_final = st.session_state.get("new_merk_custom", "").strip() or "-"
+                else:
+                    merk_final = merk_pilih_val
+            else:
+                merk_final = st.session_state.get("new_merk_free", "").strip() or "-"
+
             errors = []
-            if not f_supplier.strip(): errors.append("Nama Supplier")
-            if not f_nama.strip():     errors.append("Nama Barang")
-            if f_qty <= 0:             errors.append("Kuantitas harus lebih dari 0")
-            if f_harga <= 0:           errors.append("Harga Satuan harus lebih dari 0")
+            if not f_supplier.strip():  errors.append("Nama Supplier")
+            if not nama_final:          errors.append("Nama Barang")
+            if f_qty <= 0:              errors.append("Kuantitas harus lebih dari 0")
+            if f_harga <= 0:            errors.append("Harga Satuan harus lebih dari 0")
 
             if errors:
                 st.error("❌ Harap lengkapi kolom berikut: " + " · ".join(errors))
@@ -456,8 +833,8 @@ def page_administrasi(df: pd.DataFrame):
                     "supplier":          f_supplier.strip(),
                     "kategori":          f_kategori,
                     "sub_kategori":      f_sub,
-                    "nama_barang":       f_nama.strip(),
-                    "merk":              f_merk.strip() or "-",
+                    "nama_barang":       nama_final,
+                    "merk":              merk_final,
                     "grind_size":        f_grind,
                     "qty":               float(f_qty),
                     "uom":               f_uom,
@@ -468,7 +845,7 @@ def page_administrasi(df: pd.DataFrame):
                     "catatan":           f_catatan.strip() or None,
                 })
                 if ok:
-                    st.success(f"✅ Transaksi **{f_nama.strip()}** dari **{f_supplier.strip()}** berhasil dicatat!")
+                    st.success(f"✅ Transaksi **{nama_final}** dari **{f_supplier.strip()}** berhasil dicatat!")
                     st.balloons()
 
     # ── TAB: RIWAYAT ─────────────────────────────────────────────────────────────
@@ -558,13 +935,39 @@ def page_administrasi(df: pd.DataFrame):
                                 sub_n  = row.get("sub_kategori", sub_l[0])
                                 e_sub  = st.selectbox("Sub Kategori", sub_l,
                                     index=sub_l.index(sub_n) if sub_n in sub_l else 0)
-                                e_nama = st.text_input("Nama Barang",
-                                    value=str(row.get("nama_barang") or ""))
+
+                                # Nama Barang edit — drill down
+                                nama_opts = NAMA_BARANG_MAP.get((e_kat, e_sub), ["Lainnya"])
+                                cur_nama  = row.get("nama_barang", "")
+                                nama_idx  = nama_opts.index(cur_nama) if cur_nama in nama_opts else len(nama_opts) - 1
+                                e_nama_pilih = st.selectbox("Nama Barang", nama_opts,
+                                    index=nama_idx, key=f"edit_nama_pilih_{id_pilih}")
+                                if e_nama_pilih == "Lainnya":
+                                    e_nama = st.text_input("Ketik Nama Barang Baru",
+                                        value=cur_nama if cur_nama not in nama_opts else "",
+                                        key=f"edit_nama_custom_{id_pilih}")
+                                else:
+                                    e_nama = e_nama_pilih
 
                             ec4, ec5, ec6 = st.columns(3)
                             with ec4:
-                                e_merk  = st.text_input("Merk",
-                                    value=str(row.get("merk") or ""))
+                                # Merk edit
+                                cur_merk = str(row.get("merk") or "")
+                                merk_pre = MERK_MAP.get(e_nama_pilih, None)
+                                if merk_pre:
+                                    merk_idx = merk_pre.index(cur_merk) if cur_merk in merk_pre else len(merk_pre) - 1
+                                    e_merk_pilih = st.selectbox("Merk / Brand", merk_pre,
+                                        index=merk_idx, key=f"edit_merk_pilih_{id_pilih}")
+                                    if e_merk_pilih == "Lainnya":
+                                        e_merk = st.text_input("Ketik Merk Baru",
+                                            value=cur_merk if cur_merk not in merk_pre else "",
+                                            key=f"edit_merk_custom_{id_pilih}")
+                                    else:
+                                        e_merk = e_merk_pilih
+                                else:
+                                    e_merk = st.text_input("Merk", value=cur_merk,
+                                        key=f"edit_merk_free_{id_pilih}")
+
                             with ec5:
                                 e_qty   = st.number_input("Qty",
                                     value=float(row.get("qty", 0)),
