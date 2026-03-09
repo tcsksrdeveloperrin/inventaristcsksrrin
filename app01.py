@@ -1,6 +1,5 @@
 import streamlit as st
 import pandas as pd
-import numpy as np
 from datetime import date, datetime
 
 # ─── PAGE CONFIG ─────────────────────────────────────────────────────────────────
@@ -264,32 +263,357 @@ DIGUNAKAN_DI_MENU = {
     "Kertas Struk Thermal 80mm":                        "Printer kasir / nota transaksi",
 }
 
+# Satuan Kuantitas Unit yang Dibeli — berapa kemasan/unit diterima dari supplier
 UOM_QTY_OPTIONS = [
     "pcs", "pack", "dus / karton", "kantong", "botol",
     "lusin", "ikat", "buah", "ekor", "bungkus",
     "tray", "galon", "roll", "sachet",
     "lembar", "bal", "porsi",
 ]
-UOM_OPTIONS = UOM_QTY_OPTIONS  # Alias for simplified edit view
+
+# Satuan Berat / Volume per Satu Unit yang Dibeli
 VOL_OPTIONS = ["ml", "liter", "gram (g)", "kg", "mg", "ons"]
 
+# Faktor konversi ke unit dasar (gram/ml) untuk kalkulasi netto total
 VOL_FAKTOR = {
     "ml": 1, "liter": 1000,
     "gram (g)": 1, "kg": 1000, "mg": 0.001, "ons": 100,
 }
 
+# Faktor pengali untuk satuan qty yang punya jumlah pcs baku
 QTY_MULTIPLIER = {
     "lusin": 12,
+    # Semua lainnya = 1 (tidak bisa diasumsi, tergantung produk)
 }
 
 GRIND_OPTIONS  = ["-", "Whole Bean", "V60 (5-6)", "Vietnam Drip (3-4)", "Espresso (2-3)", "French Press (7-8)"]
 STATUS_OPTIONS = ["Lunas", "Tempo (Hutang)", "DP/Uang Muka"]
 
+# ─── SHELF LIFE MAP ──────────────────────────────────────────────────────────────
+# Produk yang TIDAK atau MUNGKIN TIDAK memiliki expired date di kemasan.
+# Program menghitung estimasi otomatis berdasarkan metode penyimpanan.
+# Format: { nama_barang: { metode_simpan: (hari_min, hari_max, keterangan) } }
+
+METODE_SIMPAN_OPTIONS = [
+    "Pilih metode penyimpanan...",
+    "Suhu Ruang",
+    "Kulkas (1–4 °C)",
+    "Pendingin / Chiller (4–10 °C)",
+    "Freezer (≤ −18 °C)",
+    "Wadah Kering / Kedap Udara",
+]
+
+SHELF_LIFE_MAP = {
+
+    # ══════════════════════════════════════════════════════════════════════════
+    # BAHAN BAKU MAKANAN — Protein
+    # ══════════════════════════════════════════════════════════════════════════
+    "Telur Ayam": {
+        "Suhu Ruang":               (7,  21,  "1–3 minggu · suhu ruang"),
+        "Kulkas (1–4 °C)":          (28, 42,  "4–6 minggu · kulkas"),
+        "Pendingin / Chiller (4–10 °C)": (21, 35, "3–5 minggu · chiller"),
+        "Freezer (≤ −18 °C)":       (90, 365, "3–12 bulan · freezer (sudah dikocok/dipisah)"),
+    },
+    "Ayam Fillet / Ayam Potong": {
+        "Suhu Ruang":               (0,  0,   "Maks 2 jam · suhu ruang — segera masak!"),
+        "Kulkas (1–4 °C)":          (1,  2,   "1–2 hari · kulkas"),
+        "Pendingin / Chiller (4–10 °C)": (1,  1, "Maks 1 hari · chiller"),
+        "Freezer (≤ −18 °C)":       (90, 270, "3–9 bulan · freezer"),
+    },
+    "Daging Kambing": {
+        "Kulkas (1–4 °C)":          (3,  5,   "3–5 hari · kulkas"),
+        "Pendingin / Chiller (4–10 °C)": (2, 3,  "2–3 hari · chiller"),
+        "Freezer (≤ −18 °C)":       (90, 180, "3–6 bulan · freezer"),
+    },
+    "Ikan Jambal Roti": {
+        "Suhu Ruang":               (14, 30,  "2–4 minggu · suhu ruang (sudah dikeringkan/diasin)"),
+        "Kulkas (1–4 °C)":          (30, 60,  "1–2 bulan · kulkas"),
+        "Pendingin / Chiller (4–10 °C)": (20, 45, "3–6 minggu · chiller"),
+        "Freezer (≤ −18 °C)":       (90, 180, "3–6 bulan · freezer"),
+        "Wadah Kering / Kedap Udara": (30, 60, "1–2 bulan · suhu ruang wadah kedap udara"),
+    },
+    "Tahu Putih / Tahu Goreng": {
+        "Suhu Ruang":               (0,  1,   "Maks 1 hari · suhu ruang"),
+        "Kulkas (1–4 °C)":          (3,  5,   "3–5 hari · kulkas (rendam air, ganti tiap hari)"),
+        "Pendingin / Chiller (4–10 °C)": (2, 3,  "2–3 hari · chiller"),
+        "Freezer (≤ −18 °C)":       (30, 60,  "1–2 bulan · freezer (tekstur berubah, cocok untuk dimasak)"),
+    },
+    "Tempe": {
+        "Suhu Ruang":               (1,  2,   "1–2 hari · suhu ruang"),
+        "Kulkas (1–4 °C)":          (5,  7,   "5–7 hari · kulkas"),
+        "Pendingin / Chiller (4–10 °C)": (3, 5,  "3–5 hari · chiller"),
+        "Freezer (≤ −18 °C)":       (90, 180, "3–6 bulan · freezer"),
+    },
+    "Oncom": {
+        "Suhu Ruang":               (1,  2,   "1–2 hari · suhu ruang"),
+        "Kulkas (1–4 °C)":          (4,  6,   "4–6 hari · kulkas"),
+        "Pendingin / Chiller (4–10 °C)": (2, 4,  "2–4 hari · chiller"),
+        "Freezer (≤ −18 °C)":       (60, 90,  "2–3 bulan · freezer"),
+    },
+    "Bakso": {
+        "Kulkas (1–4 °C)":          (3,  5,   "3–5 hari · kulkas"),
+        "Pendingin / Chiller (4–10 °C)": (2, 3,  "2–3 hari · chiller"),
+        "Freezer (≤ −18 °C)":       (30, 90,  "1–3 bulan · freezer"),
+    },
+    "Seafood Mix (Cumi, Udang, dll)": {
+        "Kulkas (1–4 °C)":          (1,  2,   "1–2 hari · kulkas"),
+        "Pendingin / Chiller (4–10 °C)": (0, 1,  "Maks 1 hari · chiller"),
+        "Freezer (≤ −18 °C)":       (90, 180, "3–6 bulan · freezer"),
+    },
+    "Abon Sapi / Abon Ayam": {
+        "Suhu Ruang":               (30, 60,  "1–2 bulan · suhu ruang (kemasan belum dibuka)"),
+        "Kulkas (1–4 °C)":          (60, 90,  "2–3 bulan · kulkas (kemasan terbuka)"),
+        "Wadah Kering / Kedap Udara": (30, 60, "1–2 bulan · wadah kedap udara"),
+    },
+    "Sosis Ayam / Sosis Sapi": {
+        "Kulkas (1–4 °C)":          (3,  7,   "3–7 hari · kulkas (kemasan dibuka)"),
+        "Pendingin / Chiller (4–10 °C)": (2, 5,  "2–5 hari · chiller"),
+        "Freezer (≤ −18 °C)":       (30, 60,  "1–2 bulan · freezer"),
+    },
+    "Pempek Original": {
+        "Suhu Ruang":               (0,  1,   "Maks 1 hari · suhu ruang (sudah dimasak)"),
+        "Kulkas (1–4 °C)":          (3,  5,   "3–5 hari · kulkas"),
+        "Pendingin / Chiller (4–10 °C)": (2, 3,  "2–3 hari · chiller"),
+        "Freezer (≤ −18 °C)":       (30, 90,  "1–3 bulan · freezer (mentah/setengah matang)"),
+    },
+    "Pempek Kapal Selam": {
+        "Suhu Ruang":               (0,  1,   "Maks 1 hari · suhu ruang (sudah dimasak)"),
+        "Kulkas (1–4 °C)":          (3,  5,   "3–5 hari · kulkas"),
+        "Pendingin / Chiller (4–10 °C)": (2, 3,  "2–3 hari · chiller"),
+        "Freezer (≤ −18 °C)":       (30, 90,  "1–3 bulan · freezer (mentah/setengah matang)"),
+    },
+    "Risoles": {
+        "Kulkas (1–4 °C)":          (2,  3,   "2–3 hari · kulkas (mentah, belum digoreng)"),
+        "Pendingin / Chiller (4–10 °C)": (1, 2,  "1–2 hari · chiller"),
+        "Freezer (≤ −18 °C)":       (30, 60,  "1–2 bulan · freezer (mentah, belum digoreng)"),
+    },
+
+    # ══════════════════════════════════════════════════════════════════════════
+    # BAHAN BAKU MAKANAN — Fresh & Produce
+    # ══════════════════════════════════════════════════════════════════════════
+    "Beras (Nasi Putih)": {
+        "Suhu Ruang":               (180, 365, "6–12 bulan · suhu ruang (beras mentah, wadah tertutup)"),
+        "Wadah Kering / Kedap Udara": (365, 730, "1–2 tahun · wadah kedap udara"),
+    },
+    "Kwetiau / Mie Kwetiau": {
+        "Suhu Ruang":               (1,  2,   "1–2 hari · suhu ruang (kwetiau basah segar)"),
+        "Kulkas (1–4 °C)":          (3,  5,   "3–5 hari · kulkas (kwetiau basah)"),
+        "Pendingin / Chiller (4–10 °C)": (2, 3,  "2–3 hari · chiller"),
+        "Freezer (≤ −18 °C)":       (30, 90,  "1–3 bulan · freezer"),
+    },
+    "Kol / Kubis": {
+        "Suhu Ruang":               (3,  5,   "3–5 hari · suhu ruang"),
+        "Kulkas (1–4 °C)":          (14, 21,  "2–3 minggu · kulkas"),
+        "Pendingin / Chiller (4–10 °C)": (10, 18, "10–18 hari · chiller"),
+    },
+    "Pisang Kepok / Cavendish": {
+        "Suhu Ruang":               (3,  7,   "3–7 hari · suhu ruang (tergantung kematangan)"),
+        "Kulkas (1–4 °C)":          (7,  14,  "1–2 minggu · kulkas (kulit menghitam, daging tetap baik)"),
+        "Pendingin / Chiller (4–10 °C)": (5, 10, "5–10 hari · chiller"),
+    },
+    "Kentang": {
+        "Suhu Ruang":               (14, 30,  "2–4 minggu · suhu ruang (tempat gelap & kering)"),
+        "Kulkas (1–4 °C)":          (30, 60,  "1–2 bulan · kulkas"),
+        "Pendingin / Chiller (4–10 °C)": (21, 45, "3–6 minggu · chiller"),
+        "Wadah Kering / Kedap Udara": (30, 60, "1–2 bulan · tempat gelap kering"),
+    },
+    "Sayuran Capcay (Wortel, Sawi, Jagung muda, dll)": {
+        "Suhu Ruang":               (1,  2,   "1–2 hari · suhu ruang"),
+        "Kulkas (1–4 °C)":          (5,  7,   "5–7 hari · kulkas"),
+        "Pendingin / Chiller (4–10 °C)": (3, 5,  "3–5 hari · chiller"),
+        "Freezer (≤ −18 °C)":       (90, 180, "3–6 bulan · freezer (sudah di-blanching)"),
+    },
+
+    # ══════════════════════════════════════════════════════════════════════════
+    # BAHAN BAKU MAKANAN — Adonan & Tepung
+    # ══════════════════════════════════════════════════════════════════════════
+    "Adonan Surabi (Tepung Beras + Santan)": {
+        "Kulkas (1–4 °C)":          (1,  2,   "1–2 hari · kulkas"),
+        "Pendingin / Chiller (4–10 °C)": (0, 1,  "Maks 1 hari · chiller"),
+        "Freezer (≤ −18 °C)":       (7,  14,  "1–2 minggu · freezer"),
+    },
+    "Beras Ketan": {
+        "Suhu Ruang":               (180, 365, "6–12 bulan · suhu ruang (mentah, kering)"),
+        "Wadah Kering / Kedap Udara": (365, 730, "1–2 tahun · wadah kedap udara"),
+    },
+    "Tepung Terigu": {
+        "Suhu Ruang":               (180, 365, "6–12 bulan · suhu ruang (kemasan tertutup)"),
+        "Wadah Kering / Kedap Udara": (365, 548, "1–1,5 tahun · wadah kedap udara"),
+    },
+
+    # ══════════════════════════════════════════════════════════════════════════
+    # BAHAN BAKU MAKANAN — Dairy & Topping
+    # ══════════════════════════════════════════════════════════════════════════
+    "Keju Cheddar": {
+        "Kulkas (1–4 °C)":          (14, 30,  "2–4 minggu · kulkas (kemasan dibuka)"),
+        "Pendingin / Chiller (4–10 °C)": (7, 14, "1–2 minggu · chiller"),
+        "Freezer (≤ −18 °C)":       (60, 180, "2–6 bulan · freezer (tekstur sedikit berubah)"),
+    },
+    "Keju Mozarella": {
+        "Kulkas (1–4 °C)":          (7,  21,  "1–3 minggu · kulkas"),
+        "Pendingin / Chiller (4–10 °C)": (5, 14, "5–14 hari · chiller"),
+        "Freezer (≤ −18 °C)":       (30, 90,  "1–3 bulan · freezer"),
+    },
+    "Meses / Cokelat Serut": {
+        "Suhu Ruang":               (180, 365, "6–12 bulan · suhu ruang (kemasan tertutup, tempat sejuk)"),
+        "Wadah Kering / Kedap Udara": (180, 365, "6–12 bulan · wadah kedap udara"),
+    },
+    "Pasta Cokelat / Dark Chocolate": {
+        "Suhu Ruang":               (90, 180,  "3–6 bulan · suhu ruang (sejuk, tidak kena sinar langsung)"),
+        "Kulkas (1–4 °C)":          (180, 365, "6–12 bulan · kulkas"),
+        "Wadah Kering / Kedap Udara": (120, 240, "4–8 bulan · wadah kedap udara"),
+    },
+
+    # ══════════════════════════════════════════════════════════════════════════
+    # BAHAN BAKU MAKANAN — Bumbu & Pelengkap
+    # ══════════════════════════════════════════════════════════════════════════
+    "Bawang Merah & Bawang Putih": {
+        "Suhu Ruang":               (14, 30,  "2–4 minggu · suhu ruang (tempat kering & sirkulasi udara baik)"),
+        "Kulkas (1–4 °C)":          (30, 60,  "1–2 bulan · kulkas (sudah dikupas, wadah tertutup)"),
+        "Pendingin / Chiller (4–10 °C)": (21, 45, "3–6 minggu · chiller"),
+        "Wadah Kering / Kedap Udara": (30, 60, "1–2 bulan · kering & gelap"),
+    },
+    "Bawang Goreng Crispy": {
+        "Suhu Ruang":               (14, 30,  "2–4 minggu · suhu ruang (wadah tertutup rapat)"),
+        "Wadah Kering / Kedap Udara": (30, 60, "1–2 bulan · wadah kedap udara"),
+    },
+    "Sambal": {
+        "Suhu Ruang":               (0,  1,   "Maks 1 hari · suhu ruang (sambal segar/homemade)"),
+        "Kulkas (1–4 °C)":          (5,  7,   "5–7 hari · kulkas"),
+        "Pendingin / Chiller (4–10 °C)": (3, 5,  "3–5 hari · chiller"),
+        "Freezer (≤ −18 °C)":       (30, 60,  "1–2 bulan · freezer"),
+    },
+    "Saus Tomat": {
+        "Suhu Ruang":               (7,  14,  "1–2 minggu · suhu ruang (botol dibuka)"),
+        "Kulkas (1–4 °C)":          (30, 45,  "1–1,5 bulan · kulkas (botol dibuka)"),
+        "Pendingin / Chiller (4–10 °C)": (21, 35, "3–5 minggu · chiller"),
+    },
+    "Saus Hot / Saus Pedas": {
+        "Suhu Ruang":               (14, 30,  "2–4 minggu · suhu ruang (botol dibuka)"),
+        "Kulkas (1–4 °C)":          (60, 90,  "2–3 bulan · kulkas (botol dibuka)"),
+        "Pendingin / Chiller (4–10 °C)": (30, 60, "1–2 bulan · chiller"),
+    },
+    "Cuko Pempek": {
+        "Suhu Ruang":               (1,  2,   "1–2 hari · suhu ruang (homemade)"),
+        "Kulkas (1–4 °C)":          (7,  14,  "1–2 minggu · kulkas"),
+        "Pendingin / Chiller (4–10 °C)": (5, 10, "5–10 hari · chiller"),
+        "Freezer (≤ −18 °C)":       (60, 90,  "2–3 bulan · freezer"),
+    },
+    "Serundeng Kelapa": {
+        "Suhu Ruang":               (7,  14,  "1–2 minggu · suhu ruang (wadah tertutup)"),
+        "Kulkas (1–4 °C)":          (21, 30,  "3–4 minggu · kulkas"),
+        "Wadah Kering / Kedap Udara": (14, 30, "2–4 minggu · wadah kedap udara"),
+    },
+    "Minyak Goreng": {
+        "Suhu Ruang":               (180, 365, "6–12 bulan · suhu ruang (botol belum dibuka)"),
+        "Wadah Kering / Kedap Udara": (90, 180, "3–6 bulan · setelah dibuka (jauhkan dari panas & cahaya)"),
+    },
+    "Garam, Gula Pasir, Kecap Manis, Merica": {
+        "Suhu Ruang":               (365, 730, "1–2 tahun · suhu ruang (tempat kering)"),
+        "Wadah Kering / Kedap Udara": (730, 1095, "2–3 tahun · wadah kedap udara"),
+    },
+
+    # ══════════════════════════════════════════════════════════════════════════
+    # BAHAN BAKU MINUMAN
+    # ══════════════════════════════════════════════════════════════════════════
+    "Beans Natural": {
+        "Suhu Ruang":               (14, 30,  "2–4 minggu setelah roasting · suhu ruang (kedap udara)"),
+        "Kulkas (1–4 °C)":          (30, 60,  "1–2 bulan · kulkas (wadah kedap udara, hindari kelembapan)"),
+        "Freezer (≤ −18 °C)":       (90, 180, "3–6 bulan · freezer (wadah kedap udara, 1x beku jangan dicairkan ulang)"),
+        "Wadah Kering / Kedap Udara": (21, 60, "3–8 minggu · wadah kedap udara suhu ruang"),
+    },
+    "Espresso Shot": {
+        "Suhu Ruang":               (0, 0,    "Konsumsi segera · espresso shot hanya tahan 20–30 detik"),
+    },
+    "Susu Full Cream": {
+        "Kulkas (1–4 °C)":          (5,  7,   "5–7 hari · kulkas (susu segar setelah dibuka)"),
+        "Pendingin / Chiller (4–10 °C)": (3, 5,  "3–5 hari · chiller"),
+    },
+    "Susu UHT Full Cream": {
+        "Suhu Ruang":               (180, 270, "6–9 bulan · suhu ruang (belum dibuka, cek kemasan)"),
+        "Kulkas (1–4 °C)":          (5,  7,   "5–7 hari · kulkas (setelah dibuka)"),
+        "Pendingin / Chiller (4–10 °C)": (3, 5, "3–5 hari · chiller (setelah dibuka)"),
+    },
+    "SKM (Susu Kental Manis)": {
+        "Suhu Ruang":               (14, 30,  "2–4 minggu · suhu ruang (kaleng/sachet dibuka, pindah ke wadah tertutup)"),
+        "Kulkas (1–4 °C)":          (14, 21,  "2–3 minggu · kulkas (sudah dibuka)"),
+    },
+    "Creamer Cair / Krim Masak": {
+        "Kulkas (1–4 °C)":          (7,  14,  "1–2 minggu · kulkas (setelah dibuka)"),
+        "Pendingin / Chiller (4–10 °C)": (5, 10, "5–10 hari · chiller"),
+        "Freezer (≤ −18 °C)":       (90, 180, "3–6 bulan · freezer"),
+    },
+    "Powder Hazelnut": {
+        "Suhu Ruang":               (180, 365, "6–12 bulan · suhu ruang (kemasan tertutup, kering)"),
+        "Wadah Kering / Kedap Udara": (180, 365, "6–12 bulan · wadah kedap udara"),
+    },
+    "Powder Greentea / Matcha": {
+        "Suhu Ruang":               (90, 180, "3–6 bulan · suhu ruang (kemasan tertutup)"),
+        "Kulkas (1–4 °C)":          (180, 365, "6–12 bulan · kulkas (wadah kedap udara)"),
+        "Wadah Kering / Kedap Udara": (90, 180, "3–6 bulan · wadah kedap udara"),
+    },
+    "Powder Red Velvet": {
+        "Suhu Ruang":               (180, 365, "6–12 bulan · suhu ruang (kemasan tertutup)"),
+        "Wadah Kering / Kedap Udara": (180, 365, "6–12 bulan · wadah kedap udara"),
+    },
+    "Powder Chocolate / Coklat Bubuk": {
+        "Suhu Ruang":               (180, 365, "6–12 bulan · suhu ruang (kering)"),
+        "Wadah Kering / Kedap Udara": (365, 730, "1–2 tahun · wadah kedap udara"),
+    },
+    "Gula Aren / Aren Liquid": {
+        "Suhu Ruang":               (30, 60,  "1–2 bulan · suhu ruang (cair, botol tertutup)"),
+        "Kulkas (1–4 °C)":          (90, 180, "3–6 bulan · kulkas"),
+        "Pendingin / Chiller (4–10 °C)": (60, 120, "2–4 bulan · chiller"),
+    },
+    "Simple Syrup (Gula Cair)": {
+        "Suhu Ruang":               (14, 30,  "2–4 minggu · suhu ruang (botol steril, tertutup rapat)"),
+        "Kulkas (1–4 °C)":          (30, 60,  "1–2 bulan · kulkas"),
+        "Pendingin / Chiller (4–10 °C)": (21, 45, "3–6 minggu · chiller"),
+    },
+    "Syrup Hazelnut": {
+        "Suhu Ruang":               (180, 365, "6–12 bulan · suhu ruang (belum dibuka)"),
+        "Kulkas (1–4 °C)":          (30, 90,  "1–3 bulan · kulkas (setelah dibuka)"),
+    },
+    "Syrup Leci": {
+        "Suhu Ruang":               (180, 365, "6–12 bulan · suhu ruang (belum dibuka)"),
+        "Kulkas (1–4 °C)":          (30, 90,  "1–3 bulan · kulkas (setelah dibuka)"),
+    },
+    "Syrup Melon": {
+        "Suhu Ruang":               (180, 365, "6–12 bulan · suhu ruang (belum dibuka)"),
+        "Kulkas (1–4 °C)":          (30, 90,  "1–3 bulan · kulkas (setelah dibuka)"),
+    },
+    "Syrup Strawberry": {
+        "Suhu Ruang":               (180, 365, "6–12 bulan · suhu ruang (belum dibuka)"),
+        "Kulkas (1–4 °C)":          (30, 90,  "1–3 bulan · kulkas (setelah dibuka)"),
+    },
+    "Lemon Segar": {
+        "Suhu Ruang":               (7,  14,  "1–2 minggu · suhu ruang"),
+        "Kulkas (1–4 °C)":          (21, 42,  "3–6 minggu · kulkas"),
+        "Pendingin / Chiller (4–10 °C)": (14, 30, "2–4 minggu · chiller"),
+    },
+    "Teh Celup / Teh Bubuk": {
+        "Suhu Ruang":               (365, 730, "1–2 tahun · suhu ruang (teh kering, kemasan tertutup)"),
+        "Wadah Kering / Kedap Udara": (365, 730, "1–2 tahun · wadah kedap udara"),
+    },
+    "Yakult": {
+        "Kulkas (1–4 °C)":          (14, 30,  "2–4 minggu · kulkas (cek tanggal di botol)"),
+        "Pendingin / Chiller (4–10 °C)": (10, 21, "10–21 hari · chiller"),
+    },
+    "Air Mineral / Air Galon": {
+        "Suhu Ruang":               (14, 30,  "2–4 minggu · suhu ruang (galon terpasang di dispenser, jauh dari sinar matahari)"),
+        "Wadah Kering / Kedap Udara": (30, 60, "1–2 bulan · galon tersegel belum dibuka"),
+    },
+    "Es Batu Kristal / Batangan": {
+        "Freezer (≤ −18 °C)":       (30, 90,  "1–3 bulan · freezer (tersegel, jauh dari bahan berbau)"),
+    },
+}
+
 KOLOM_DB = [
     "id", "cabang", "tanggal", "jam_transaksi", "no_nota", "supplier", "nama_pencatat",
     "kategori", "sub_kategori", "nama_barang", "merk", "grind_size",
     "qty", "uom_qty", "vol_per_unit", "uom_vol", "netto_total",
-    "harga_total", "tgl_kadaluarsa", "status_pembayaran", "catatan", "created_at",
+    "harga_total",
+    "tgl_kadaluarsa", "status_pembayaran", "catatan", "created_at",
 ]
 
 # ─── SESSION STATE ───────────────────────────────────────────────────────────────
@@ -301,7 +625,6 @@ def init_session():
         "username":   None,
         "local_data": [],
         "next_id":    1,
-        "item_keranjang": [],
     }
     for k, v in defaults.items():
         if k not in st.session_state:
@@ -333,6 +656,7 @@ def get_data(cabang: str) -> pd.DataFrame:
 def insert_row(data: dict) -> bool:
     if supabase:
         try:
+            # Hapus kolom yang dihitung di sisi DB (generated / computed)
             excluded = {"total_harga", "harga_satuan", "uom"}
             payload = {k: v for k, v in data.items() if k not in excluded}
             supabase.table("transaksi").insert(payload).execute()
@@ -349,6 +673,7 @@ def insert_row(data: dict) -> bool:
 def update_row(row_id, data: dict) -> bool:
     if supabase:
         try:
+            # Hapus kolom generated (total_harga dihitung otomatis oleh Supabase)
             payload = {k: v for k, v in data.items() if k != "total_harga"}
             supabase.table("transaksi").update(payload).eq("id", row_id).execute()
             return True
@@ -456,6 +781,8 @@ def show_sidebar():
         pages = [
             "📊 Dashboard",
             "📋 Administrasi",
+            "🏷️ Identitas Barang",
+            "📦 Detail Stok",
             "🔍 Kontrol & Audit",
         ]
         page = st.radio("Menu", pages, label_visibility="collapsed")
@@ -470,13 +797,18 @@ def show_sidebar():
     return page
 
 # ─── HELPER: RESOLVE NILAI SEKSI 2 DARI SESSION STATE ────────────────────────────
+# FIX: Semua widget Seksi 2 ada di LUAR st.form() sehingga drill-down reaktif.
+# Nilai dibaca dari st.session_state saat submit form Seksi 3-4.
+
 def _get_s2_nama() -> str:
+    """Kembalikan nama barang final (custom jika Lainnya)."""
     sel = st.session_state.get("s2_nama_sel", "Lainnya")
     if sel == "Lainnya":
         return st.session_state.get("s2_nama_custom", "").strip()
     return sel
 
 def _get_s2_merk() -> str:
+    """Kembalikan merk/brand final (custom jika Lainnya)."""
     sel = st.session_state.get("s2_nama_sel", "Lainnya")
     presets = MERK_MAP.get(sel)
     if presets:
@@ -487,13 +819,20 @@ def _get_s2_merk() -> str:
     return st.session_state.get("s2_merk_free", "").strip() or "-"
 
 def _get_s2_grind() -> str:
+    """Kembalikan grind size (hanya aktif untuk Coffee Beans)."""
     kat = st.session_state.get("s2_kategori", "")
     sub = st.session_state.get("s2_sub", "")
     if kat == "Bahan Baku Minuman" and sub == "Coffee Beans":
         return st.session_state.get("s2_grind", "-")
     return "-"
 
+# ─── HELPER: FOTO INVOICE ────────────────────────────────────────────────────────
 def render_foto_invoice():
+    """
+    Tampilkan kamera real-time untuk foto invoice.
+    Nama file: {no_nota}_{cabang}_{YYYYMMDD}_{HHMMSS}.jpg
+    Mengembalikan (bytes_foto | None, nama_file | None, timestamp_str | None).
+    """
     foto_bytes = st.camera_input(
         "📷 Arahkan kamera ke nota/invoice, lalu tekan tombol capture",
         help="Nama file otomatis: {nota}_{cabang}_{tanggal}_{jam}.jpg",
@@ -526,6 +865,22 @@ def render_foto_invoice():
         return foto_bytes.getvalue(), nama_file, now.strftime("%H:%M:%S")
     return None, None, None
 
+# ─── HELPER: HITUNG KADALUARSA OTOMATIS ─────────────────────────────────────────
+def hitung_kadaluarsa_otomatis(nama_barang: str, metode: str, tgl_beli: date):
+    """
+    Hitung estimasi tanggal kadaluarsa otomatis berdasarkan SHELF_LIFE_MAP.
+    Mengembalikan (tgl_min: date, tgl_max: date, label: str) atau (None, None, "").
+    """
+    from datetime import timedelta
+    produk_map = SHELF_LIFE_MAP.get(nama_barang)
+    if not produk_map or metode not in produk_map:
+        return None, None, ""
+    hari_min, hari_max, label = produk_map[metode]
+    return (
+        tgl_beli + timedelta(days=hari_min),
+        tgl_beli + timedelta(days=hari_max),
+        label,
+    )
 
 # ─── PAGE: DASHBOARD ─────────────────────────────────────────────────────────────
 def page_dashboard(df: pd.DataFrame):
@@ -537,68 +892,55 @@ def page_dashboard(df: pd.DataFrame):
                     "Mulai catat transaksi pertama di halaman Administrasi.")
         return
 
-    df["harga_total"]  = pd.to_numeric(df["harga_total"],  errors="coerce").fillna(0)
+    df["total_harga"]  = pd.to_numeric(df["total_harga"],  errors="coerce").fillna(0)
+    df["harga_satuan"] = pd.to_numeric(df["harga_satuan"], errors="coerce").fillna(0)
     df["qty"]          = pd.to_numeric(df["qty"],          errors="coerce").fillna(0)
 
-    # Calculate metrics
-    total_keluar = df["harga_total"].sum()
-    total_trx    = df["no_nota"].nunique() if "no_nota" in df.columns else len(df)
-    total_hutang = df[df["status_pembayaran"].str.contains("Tempo|DP", na=False)]["harga_total"].sum()
+    total_keluar = df["total_harga"].sum()
+    total_trx    = len(df)
+    n_lunas      = len(df[df["status_pembayaran"] == "Lunas"])
+    total_hutang = df[df["status_pembayaran"].str.contains("Tempo|DP", na=False)]["total_harga"].sum()
 
-    # Warning Kadaluarsa
-    jml_peringatan = 0
-    if "tgl_kadaluarsa" in df.columns:
-        df_exp = df[df["tgl_kadaluarsa"].notna() & (df["tgl_kadaluarsa"].astype(str).str.strip().isin(["", "None"]) == False)].copy()
-        if not df_exp.empty:
-            df_exp["tgl_kadaluarsa"] = pd.to_datetime(df_exp["tgl_kadaluarsa"], errors="coerce")
-            today = pd.Timestamp.today().normalize()
-            jml_peringatan = len(df_exp[df_exp["tgl_kadaluarsa"] <= today + pd.Timedelta(days=30)])
-
-    # ── Flashcards
     c1, c2, c3, c4 = st.columns(4)
     c1.metric("💸 Total Pengeluaran",    f"Rp {total_keluar:,.0f}")
-    c2.metric("📝 Jumlah Transaksi (Nota)", total_trx)
-    c3.metric("⏳ Total Hutang",          f"Rp {total_hutang:,.0f}")
-    c4.metric("⚠️ Peringatan (≤ 30 Hari)", f"{jml_peringatan} Item")
+    c2.metric("📝 Jumlah Transaksi",      total_trx)
+    c3.metric("✅ Lunas",               f"{n_lunas} dari {total_trx}")
+    c4.metric("⏳ Total Hutang Supplier", f"Rp {total_hutang:,.0f}")
 
     st.markdown("---")
-    
-    # ── Chart 1 & Chart 2
-    col_a, col_b = st.columns([1, 1.5])
+    col_a, col_b = st.columns(2)
     with col_a:
         st.subheader("📂 Pengeluaran per Kategori")
-        kat = df.groupby("kategori")["harga_total"].sum().reset_index()
+        kat = df.groupby("kategori")["total_harga"].sum().reset_index()
         kat.columns = ["Kategori", "Total (Rp)"]
         st.dataframe(kat.sort_values("Total (Rp)", ascending=False),
                      use_container_width=True, hide_index=True)
-
     with col_b:
-        st.subheader("📈 Analisis Time Series & Tren Pengeluaran")
-        if "tanggal" in df.columns:
-            # Mengelompokkan total harga berdasarkan tanggal
-            daily_spend = df.groupby("tanggal")["harga_total"].sum().reset_index()
-            daily_spend["tanggal"] = pd.to_datetime(daily_spend["tanggal"])
-            daily_spend = daily_spend.sort_values("tanggal").dropna(subset=["harga_total"])
-            
-            if len(daily_spend) > 1:
-                # 1. Menghitung Rolling Average (Time Series basic)
-                daily_spend["Rata_rata_Bergerak_7h"] = daily_spend["harga_total"].rolling(window=7, min_periods=1).mean()
-                
-                # 2. Linear Regression (Analisis Tren)
-                x = np.arange(len(daily_spend))
-                y = daily_spend["harga_total"].values
-                slope, intercept = np.polyfit(x, y, 1)
-                daily_spend["Tren_Regresi_Linear"] = slope * x + intercept
-                
-                # Mempersiapkan data untuk chart
-                chart_data = daily_spend.set_index("tanggal")[["harga_total", "Rata_rata_Bergerak_7h", "Tren_Regresi_Linear"]]
-                chart_data.rename(columns={"harga_total": "Pengeluaran Aktual"}, inplace=True)
-                
-                st.line_chart(chart_data, use_container_width=True)
-                st.caption("Visualisasi ini menggunakan **Regresi Linear** untuk garis tren dan **Rata-rata Bergerak 7 Hari (Rolling Average)** untuk meredam fluktuasi harian pengeluaran bahan baku.")
-            else:
-                st.info("Butuh minimal 2 hari transaksi untuk memproses visualisasi regresi dan time series.")
+        st.subheader("🏪 Top Supplier")
+        sup = df.groupby("supplier")["total_harga"].sum().reset_index()
+        sup.columns = ["Supplier", "Total (Rp)"]
+        st.dataframe(sup.sort_values("Total (Rp)", ascending=False).head(8),
+                     use_container_width=True, hide_index=True)
 
+    st.markdown("---")
+    st.subheader("⚠️ Peringatan Kadaluarsa 30 Hari ke Depan")
+    if "tgl_kadaluarsa" in df.columns:
+        df_exp = df[
+            df["tgl_kadaluarsa"].notna() &
+            (df["tgl_kadaluarsa"].astype(str).str.strip().isin(["", "None"]) == False)
+        ].copy()
+        if not df_exp.empty:
+            df_exp["tgl_kadaluarsa"] = pd.to_datetime(df_exp["tgl_kadaluarsa"], errors="coerce")
+            today = pd.Timestamp.today().normalize()
+            soon  = df_exp[df_exp["tgl_kadaluarsa"] <= today + pd.Timedelta(days=30)]
+            if not soon.empty:
+                cols = [c for c in ["nama_barang","merk","qty","uom","tgl_kadaluarsa"] if c in soon.columns]
+                st.dataframe(soon[cols].sort_values("tgl_kadaluarsa"),
+                             use_container_width=True, hide_index=True)
+            else:
+                st.success("Tidak ada barang yang akan kadaluarsa dalam 30 hari ke depan.")
+        else:
+            st.info("Belum ada data kadaluarsa yang dicatat.")
 
 # ─── PAGE: ADMINISTRASI ───────────────────────────────────────────────────────────
 def page_administrasi(df: pd.DataFrame):
@@ -612,23 +954,34 @@ def page_administrasi(df: pd.DataFrame):
 
     # ═══════════════════════════════════════════════════════════════════════════
     # TAB 1: CATAT TRANSAKSI BARU
+    # ARSITEKTUR: Seksi 1+2 di LUAR form (reaktif), Seksi 3+4 di DALAM form.
+    # Satu sesi nota bisa menampung banyak item (multi-item per transaksi).
     # ═══════════════════════════════════════════════════════════════════════════
     with tab_catat:
         st.caption("Kolom bertanda \\* wajib diisi.")
 
-        st.markdown('<p class="form-section-title">📋 Seksi 1 — Administrasi</p>', unsafe_allow_html=True)
+        # ── SEKSI 1: ADMINISTRASI ─────────────────────────────────────────────
+        st.markdown('<p class="form-section-title">📋 Seksi 1 — Administrasi</p>',
+                    unsafe_allow_html=True)
 
         c1a, c1b, c1c = st.columns(3)
         with c1a:
             st.date_input("Tanggal Transaksi *", value=date.today(), key="s1_tgl")
-            st.time_input("Jam Transaksi *", value=datetime.now().time(), key="s1_jam")
+            st.time_input("Jam Transaksi *", value=datetime.now().time(), key="s1_jam",
+                          help="Jam saat transaksi terjadi — dicatat di database dan nama foto")
         with c1b:
             st.text_input("Nomor Nota / Invoice", placeholder="Contoh: INV-001", key="s1_nota")
-            st.text_input("Nama Supplier *", placeholder="Contoh: Roastery A, Makmur Plastik", key="s1_sup")
+            st.text_input("Nama Supplier *",
+                          placeholder="Contoh: Roastery A, Makmur Plastik", key="s1_sup")
         with c1c:
-            st.text_input("Nama Pencatat *", placeholder="Nama staf yang melakukan pembelian", key="s1_pencatat")
+            st.text_input("Nama Pencatat *",
+                          placeholder="Nama staf yang melakukan pembelian",
+                          key="s1_pencatat",
+                          help="Nama orang yang mencatat / melakukan transaksi ini")
 
-        st.markdown('<p class="form-section-title">📷 Foto Invoice — Wajib *</p>', unsafe_allow_html=True)
+        # Foto invoice — WAJIB
+        st.markdown('<p class="form-section-title">📷 Foto Invoice — Wajib *</p>',
+                    unsafe_allow_html=True)
         st.caption("Satu foto untuk satu nota. Foto berlaku untuk semua item dalam nota yang sama.")
         _foto_bytes, _nama_foto, _jam_foto = render_foto_invoice()
         if _foto_bytes is None:
@@ -636,7 +989,68 @@ def page_administrasi(df: pd.DataFrame):
 
         st.divider()
 
-        st.markdown('<p class="form-section-title">🏷️ Seksi 2 — Identitas Barang</p>', unsafe_allow_html=True)
+        # ── INFO MULTI-ITEM ───────────────────────────────────────────────────
+        # Inisialisasi keranjang item dalam session_state
+        if "item_keranjang" not in st.session_state:
+            st.session_state["item_keranjang"] = []
+
+        keranjang = st.session_state["item_keranjang"]
+
+        # Tampilkan keranjang jika sudah ada item
+        if keranjang:
+            st.markdown('<p class="form-section-title">🛒 Item dalam Nota Ini</p>',
+                        unsafe_allow_html=True)
+            df_keranjang = pd.DataFrame(keranjang)
+            cols_show_k = [c for c in ["nama_barang","merk","qty","uom_qty",
+                                        "vol_per_unit","uom_vol","harga_total",
+                                        "tgl_kadaluarsa"] if c in df_keranjang.columns]
+            st.dataframe(df_keranjang[cols_show_k], use_container_width=True, hide_index=True)
+            total_keranjang = sum(item.get("harga_total", 0) for item in keranjang)
+            st.info(f"🧾 **{len(keranjang)} item** dalam nota ini · "
+                    f"Total sementara: **Rp {total_keranjang:,.0f}**")
+
+            col_simpan_all, col_batal = st.columns(2)
+            with col_simpan_all:
+                if st.button("💾 Simpan Semua Item ke Database",
+                             type="primary", use_container_width=True,
+                             key="btn_simpan_semua"):
+                    sup_val      = st.session_state.get("s1_sup", "").strip()
+                    pencatat_val = st.session_state.get("s1_pencatat", "").strip()
+                    nota_val     = st.session_state.get("s1_nota", "").strip()
+
+                    errs_global = []
+                    if not sup_val:       errs_global.append("Nama Supplier")
+                    if not pencatat_val:  errs_global.append("Nama Pencatat")
+                    if _foto_bytes is None: errs_global.append("Foto Invoice belum diambil")
+
+                    if errs_global:
+                        st.error("Harap lengkapi: " + " · ".join(errs_global))
+                    else:
+                        berhasil = 0
+                        for item in keranjang:
+                            ok = insert_row(item)
+                            if ok:
+                                berhasil += 1
+                        if berhasil == len(keranjang):
+                            st.success(f"✅ **{berhasil} item** dari nota **{nota_val or '-'}** "
+                                       f"berhasil disimpan!")
+                            st.session_state["item_keranjang"] = []
+                            st.balloons()
+                            st.rerun()
+                        else:
+                            st.error(f"Hanya {berhasil}/{len(keranjang)} item berhasil disimpan.")
+
+            with col_batal:
+                if st.button("🗑️ Batalkan Semua Item",
+                             use_container_width=True, key="btn_batal_semua"):
+                    st.session_state["item_keranjang"] = []
+                    st.rerun()
+
+            st.divider()
+
+        # ── SEKSI 2: IDENTITAS BARANG — DI LUAR FORM ─────────────────────────
+        st.markdown('<p class="form-section-title">🏷️ Seksi 2 — Identitas Barang</p>',
+                    unsafe_allow_html=True)
 
         ca, cb = st.columns(2)
         with ca:
@@ -649,71 +1063,151 @@ def page_administrasi(df: pd.DataFrame):
 
         cc, cd, ce = st.columns(3)
         with cc:
-            nama_opts = NAMA_BARANG_MAP.get((st.session_state.s2_kategori, st.session_state.s2_sub), ["Lainnya"])
+            nama_opts = NAMA_BARANG_MAP.get(
+                (st.session_state.s2_kategori, st.session_state.s2_sub), ["Lainnya"]
+            )
             if st.session_state.get("s2_nama_sel") not in nama_opts:
                 st.session_state["s2_nama_sel"] = nama_opts[0]
-            st.selectbox("Nama Barang *", nama_opts, key="s2_nama_sel")
+            st.selectbox("Nama Barang *", nama_opts, key="s2_nama_sel",
+                         help="Pilih dari daftar, atau pilih 'Lainnya' untuk ketik manual")
             if st.session_state.s2_nama_sel == "Lainnya":
-                st.text_input("Ketik Nama Barang Baru *", key="s2_nama_custom")
+                st.text_input("Ketik Nama Barang Baru *",
+                              placeholder="Nama barang yang belum ada di daftar",
+                              key="s2_nama_custom")
         with cd:
             presets = MERK_MAP.get(st.session_state.s2_nama_sel)
             if presets:
-                st.selectbox("Merk / Brand", presets, key="s2_merk_sel")
+                st.selectbox("Merk / Brand", presets, key="s2_merk_sel",
+                             help="Pilih merk atau 'Lainnya' untuk ketik manual")
                 if st.session_state.get("s2_merk_sel") == "Lainnya":
-                    st.text_input("Ketik Merk / Brand Baru", key="s2_merk_custom")
+                    st.text_input("Ketik Merk / Brand Baru",
+                                  placeholder="Masukkan merk baru", key="s2_merk_custom")
             else:
-                st.text_input("Merk / Brand", key="s2_merk_free")
+                st.text_input("Merk / Brand",
+                              placeholder="Contoh: Diamond, Fiesta, Homemade",
+                              key="s2_merk_free")
         with ce:
-            is_kopi = (st.session_state.s2_kategori == "Bahan Baku Minuman" and st.session_state.s2_sub == "Coffee Beans")
+            is_kopi = (st.session_state.s2_kategori == "Bahan Baku Minuman"
+                       and st.session_state.s2_sub == "Coffee Beans")
             if is_kopi:
                 st.selectbox("Grind Size (Khusus Kopi) *", GRIND_OPTIONS, key="s2_grind")
             else:
-                st.selectbox("Grind Size", ["-"], key="s2_grind_dis", disabled=True)
+                st.selectbox("Grind Size", ["-"], key="s2_grind_dis",
+                             disabled=True, help="Hanya aktif untuk Coffee Beans")
+
+        nama_sel_now  = st.session_state.get("s2_nama_sel", "")
+        digunakan_now = DIGUNAKAN_DI_MENU.get(nama_sel_now, "")
+        if digunakan_now:
+            st.info(f"🍽️ **Digunakan di Menu:** {digunakan_now}")
+        elif nama_sel_now == "Lainnya":
+            st.caption("Info menu tidak tersedia untuk barang baru.")
+        else:
+            st.caption("Pilih nama barang untuk melihat info penggunaan di menu.")
 
         st.divider()
 
-        st.markdown('<p class="form-section-title">📦 Seksi 3 — Detail Stok & Harga</p>', unsafe_allow_html=True)
+        # ── SEKSI 3 & 4: DALAM FORM ───────────────────────────────────────────
+        st.markdown('<p class="form-section-title">📦 Seksi 3 — Detail Stok & Harga</p>',
+                    unsafe_allow_html=True)
+
         is_packaging = st.session_state.get("s2_kategori", "") == "Packaging"
 
         with st.form("form_catat", clear_on_submit=True):
+
+            # ── Baris 1: Qty · Satuan Qty · Vol per unit · Satuan Vol ─────────
             cA, cB, cC, cD = st.columns(4)
             with cA:
-                f_qty = st.number_input("Kuantitas (Qty) *", min_value=0.0, step=1.0, format="%.2f")
+                f_qty = st.number_input(
+                    "Kuantitas yang Dibeli (Qty) *",
+                    min_value=0.0, step=1.0, format="%.2f",
+                    help="Jumlah unit/kemasan yang kamu terima dari supplier"
+                )
             with cB:
-                f_uom_qty = st.selectbox("Satuan Qty *", UOM_QTY_OPTIONS)
+                f_uom_qty = st.selectbox(
+                    "Satuan Kuantitas (UoM Qty) *",
+                    UOM_QTY_OPTIONS,
+                    help="Satuan kemasan/unit pembelian: pcs, pack, dus, kantong, dll"
+                )
             with cC:
-                f_vol = st.number_input("Berat/Vol per Unit", min_value=0.0, step=0.1, format="%.3f")
+                f_vol = st.number_input(
+                    "Berat/Volume per Unit (Vol/Netto)",
+                    min_value=0.0, step=0.1, format="%.3f",
+                    help="Berat atau volume SATU unit. Contoh: 1 botol = 750 ml → isi 750"
+                )
             with cD:
-                f_uom_vol = st.selectbox("Satuan Vol", VOL_OPTIONS)
+                f_uom_vol = st.selectbox(
+                    "Satuan Berat/Volume (UoM Vol)",
+                    VOL_OPTIONS,
+                    help="Satuan berat/volume: ml, liter, gram, kg, ons, mg"
+                )
 
+            # ── Kalkulasi netto total otomatis ────────────────────────────────
             multiplier  = QTY_MULTIPLIER.get(f_uom_qty, 1)
             faktor_vol  = VOL_FAKTOR.get(f_uom_vol, 1)
+            # Netto total dalam satuan dasar (gram atau ml)
             netto_total = f_qty * multiplier * f_vol * faktor_vol
+
+            if f_qty > 0 and f_vol > 0:
+                satuan_dasar = "ml" if f_uom_vol in ("ml", "liter") else "gram"
+                st.caption(
+                    f"📊 **Netto Total:** {f_qty:.2f} {f_uom_qty}"
+                    + (f" × {multiplier} pcs" if multiplier > 1 else "")
+                    + f" × {f_vol:.3f} {f_uom_vol}"
+                    + f" = **{netto_total:,.1f} {satuan_dasar}**"
+                )
 
             st.divider()
 
+            # ── Baris 2: Harga Total ──────────────────────────────────────────
             st.markdown("**💰 Harga**")
             cE, cF = st.columns([1, 2])
             with cE:
-                f_harga_total = st.number_input("Harga Total (Rp) *", min_value=0, step=500)
+                f_harga_total = st.number_input(
+                    "Harga Total Pembelian (Rp) *",
+                    min_value=0, step=500,
+                    help="Isi total harga yang tertera di nota untuk item ini"
+                )
+            with cF:
+                if f_qty > 0 and f_harga_total > 0:
+                    harga_per_unit = f_harga_total / f_qty
+                    st.markdown("<br>", unsafe_allow_html=True)
+                    st.caption(
+                        f"≈ Rp {harga_per_unit:,.0f} per {f_uom_qty}"
+                        + (f" · Rp {f_harga_total / (f_qty * multiplier):,.0f} per pcs"
+                           if multiplier > 1 else "")
+                    )
 
             st.divider()
-            st.markdown('<p class="form-section-title">🔍 Seksi 4 — Kontrol & Audit</p>', unsafe_allow_html=True)
+            st.markdown('<p class="form-section-title">🔍 Seksi 4 — Kontrol & Audit</p>',
+                        unsafe_allow_html=True)
 
             ci, cj = st.columns(2)
             with ci:
+                # Tanggal kadaluarsa manual untuk semua produk KECUALI Packaging
                 if is_packaging:
                     f_exp = None
                     st.caption("ℹ️ Produk Packaging tidak memiliki tanggal kadaluarsa.")
                 else:
-                    f_exp = st.date_input("Tanggal Kadaluarsa", value=None)
+                    f_exp = st.date_input(
+                        "Tanggal Kadaluarsa",
+                        value=None,
+                        help="Isi sesuai tanggal expired di kemasan. Kosongkan jika tidak ada.",
+                    )
             with cj:
                 f_status = st.selectbox("Status Pembayaran *", STATUS_OPTIONS)
 
-            f_catatan = st.text_area("Catatan Tambahan", height=80)
+            f_catatan = st.text_area(
+                "Catatan Tambahan",
+                placeholder="Contoh: Tutup botol retak sudah diretur · Dapat diskon 5%",
+                height=80,
+            )
 
-            submit_item = st.form_submit_button("➕ Tambahkan Item ke Nota Ini", type="primary", use_container_width=True)
+            submit_item = st.form_submit_button(
+                "➕ Tambahkan Item ke Nota Ini",
+                type="primary", use_container_width=True
+            )
 
+        # ── PROSES SUBMIT ITEM ────────────────────────────────────────────────
         if submit_item:
             sup_val      = st.session_state.get("s1_sup",      "").strip()
             pencatat_val = st.session_state.get("s1_pencatat", "").strip()
@@ -761,97 +1255,91 @@ def page_administrasi(df: pd.DataFrame):
                     "foto_invoice":      _nama_foto or None,
                 }
                 st.session_state["item_keranjang"].append(item_baru)
-                st.success(f"✅ **{nama_val}** ditambahkan ke nota. Tambah item lain atau Submit Transaksi Baru di bawah.")
+                st.success(f"✅ **{nama_val}** ditambahkan ke nota. "
+                           f"Tambah item lain atau tekan 'Simpan Semua' di atas.")
                 st.rerun()
-
-        # ── KERANJANG DAN SUBMIT TRANSAKSI BARU ──────────────────────────────
-        keranjang = st.session_state.get("item_keranjang", [])
-        if keranjang:
-            st.divider()
-            st.markdown('<p class="form-section-title">🛒 Item dalam Nota Ini (Siap Disubmit)</p>', unsafe_allow_html=True)
-            df_keranjang = pd.DataFrame(keranjang)
-            cols_show_k = [c for c in ["nama_barang","merk","qty","uom_qty",
-                                        "harga_total","tgl_kadaluarsa"] if c in df_keranjang.columns]
-            st.dataframe(df_keranjang[cols_show_k], use_container_width=True, hide_index=True)
-            
-            total_keranjang = sum(item.get("harga_total", 0) for item in keranjang)
-            st.info(f"🧾 **{len(keranjang)} item** · Total Estimasi: **Rp {total_keranjang:,.0f}**")
-
-            col_simpan_all, col_batal = st.columns(2)
-            with col_simpan_all:
-                if st.button("💾 Submit Transaksi Baru (Simpan ke Database)", type="primary", use_container_width=True):
-                    sup_val      = st.session_state.get("s1_sup", "").strip()
-                    pencatat_val = st.session_state.get("s1_pencatat", "").strip()
-                    nota_val     = st.session_state.get("s1_nota", "").strip()
-
-                    errs_global = []
-                    if not sup_val:       errs_global.append("Nama Supplier")
-                    if not pencatat_val:  errs_global.append("Nama Pencatat")
-                    if _foto_bytes is None: errs_global.append("Foto Invoice belum diambil")
-
-                    if errs_global:
-                        st.error("Harap penuhi di Seksi 1: " + " · ".join(errs_global))
-                    else:
-                        berhasil = 0
-                        for item in keranjang:
-                            ok = insert_row(item)
-                            if ok:
-                                berhasil += 1
-                        if berhasil == len(keranjang):
-                            st.success(f"✅ Transaksi nota **{nota_val or '-'}** berhasil disubmit!")
-                            st.session_state["item_keranjang"] = []
-                            st.balloons()
-                            st.rerun()
-                        else:
-                            st.error(f"Hanya {berhasil}/{len(keranjang)} item berhasil disimpan.")
-
-            with col_batal:
-                if st.button("🗑️ Batalkan Transaksi", use_container_width=True):
-                    st.session_state["item_keranjang"] = []
-                    st.rerun()
 
     # ═══════════════════════════════════════════════════════════════════════════
     # TAB 2: RIWAYAT TRANSAKSI
     # ═══════════════════════════════════════════════════════════════════════════
     with tab_riwayat:
         if df.empty:
-            empty_state("📃", "Belum Ada Riwayat", "Catat transaksi pertama di tab 'Catat Transaksi Baru'.")
+            empty_state("📃", "Belum Ada Riwayat",
+                        "Catat transaksi pertama di tab 'Catat Transaksi Baru'.")
         else:
-            rf1, rf2, rf3 = st.columns(3)
+            rf1, rf2, rf3, rf4 = st.columns(4)
             with rf1:
-                cari = st.text_input("Cari Nama/Supplier", key="r_cari")
+                cari    = st.text_input("Cari nama barang / supplier", key="r_cari")
             with rf2:
                 fil_kat = st.selectbox("Kategori", ["Semua"] + KATEGORI_OPTIONS, key="r_kat")
             with rf3:
                 fil_st  = st.selectbox("Status", ["Semua"] + STATUS_OPTIONS, key="r_st")
+            with rf4:
+                fil_bln = st.text_input("Bulan (YYYY-MM)", placeholder="2025-07", key="r_bln")
 
             hasil = df.copy()
             if cari:
                 mask = (
                     hasil["nama_barang"].str.contains(cari, case=False, na=False) |
-                    hasil["supplier"].str.contains(cari, case=False, na=False) |
-                    hasil["no_nota"].astype(str).str.contains(cari, case=False, na=False)
+                    hasil["supplier"].str.contains(cari, case=False, na=False)
                 )
                 hasil = hasil[mask]
             if fil_kat != "Semua":
                 hasil = hasil[hasil["kategori"] == fil_kat]
             if fil_st != "Semua":
                 hasil = hasil[hasil["status_pembayaran"] == fil_st]
+            if fil_bln:
+                hasil = hasil[hasil["tanggal"].astype(str).str.startswith(fil_bln)]
 
-            urut = hasil.sort_values(["tanggal", "jam_transaksi"], ascending=False)
-            
-            # Tampilan Detail yang Informatif
-            col_priority = [
-                "tanggal", "no_nota", "supplier", "nama_barang", "merk",
-                "qty", "uom_qty", "harga_total", "status_pembayaran", "nama_pencatat"
-            ]
-            cols_show = [c for c in col_priority if c in urut.columns]
-            
-            st.markdown("**(Hanya Menampilkan Kolom Utama)**")
-            st.dataframe(urut[cols_show], use_container_width=True, hide_index=True)
+            urut = hasil.sort_values(
+                ["tanggal", "no_nota"], ascending=False
+            ) if "tanggal" in hasil.columns else hasil
 
-            total_f = pd.to_numeric(hasil.get("harga_total", pd.Series()), errors="coerce").sum()
-            st.caption(f"Menampilkan **{len(hasil)}** item · Total Nilai: **Rp {total_f:,.0f}**")
+            # ── Tampilan summary per nota ──────────────────────────────────
+            view_mode = st.radio(
+                "Tampilan", ["📋 Detail per Item", "🧾 Summary per Nota"],
+                horizontal=True, key="r_view_mode"
+            )
+
+            if view_mode == "🧾 Summary per Nota":
+                # Group by no_nota + tanggal
+                grup_cols = [c for c in ["tanggal","jam_transaksi","no_nota","supplier",
+                                          "nama_pencatat"] if c in urut.columns]
+                if "harga_total" in urut.columns:
+                    urut["harga_total"] = pd.to_numeric(urut["harga_total"], errors="coerce").fillna(0)
+                if "no_nota" in urut.columns:
+                    summary = (
+                        urut.groupby(["tanggal", "no_nota"], dropna=False)
+                        .agg(
+                            supplier    = ("supplier", "first"),
+                            nama_pencatat = ("nama_pencatat", "first") if "nama_pencatat" in urut.columns else ("supplier", "first"),
+                            jumlah_item = ("nama_barang", "count"),
+                            item_list   = ("nama_barang", lambda x: ", ".join(x.dropna().unique()[:5])
+                                           + ("..." if x.nunique() > 5 else "")),
+                            total_harga = ("harga_total", "sum"),
+                        )
+                        .reset_index()
+                        .sort_values("tanggal", ascending=False)
+                    )
+                    st.dataframe(summary, use_container_width=True, hide_index=True)
+                else:
+                    st.info("Kolom no_nota tidak tersedia untuk summary.")
+            else:
+                # Detail per item — kolom disesuaikan dengan skema baru
+                col_priority = [
+                    "tanggal", "jam_transaksi", "no_nota", "supplier", "nama_pencatat",
+                    "nama_barang", "merk", "kategori",
+                    "qty", "uom_qty", "vol_per_unit", "uom_vol", "netto_total",
+                    "harga_total",
+                    "tgl_kadaluarsa",
+                    "status_pembayaran",
+                ]
+                cols_show = [c for c in col_priority if c in urut.columns]
+                st.dataframe(urut[cols_show], use_container_width=True, hide_index=True)
+
+            col_total = "harga_total" if "harga_total" in hasil.columns else "total_harga"
+            total_f = pd.to_numeric(hasil.get(col_total, pd.Series()), errors="coerce").sum()
+            st.caption(f"**{len(hasil)}** item · Total: **Rp {total_f:,.0f}**")
 
     # ═══════════════════════════════════════════════════════════════════════════
     # TAB 3: KELOLA DATA (Manager only)
@@ -872,7 +1360,7 @@ def page_administrasi(df: pd.DataFrame):
         col_sel, _ = st.columns([1, 2])
         with col_sel:
             id_pilih = st.selectbox(
-                "Pilih ID Transaksi untuk Diedit",
+                "Pilih ID Transaksi",
                 df["id"].tolist(),
                 format_func=lambda x: (
                     f"ID {x} — "
@@ -883,39 +1371,117 @@ def page_administrasi(df: pd.DataFrame):
             )
 
         baris = df[df["id"] == id_pilih]
-        if baris.empty: return
-        row = baris.iloc[0]
+        if baris.empty:
+            return
 
-        with st.expander("✏️ Edit atau Hapus Transaksi Ini", expanded=True):
+        row = baris.iloc[0]
+        st.markdown(f"**Terpilih:** {row.get('nama_barang','-')} · "
+                    f"{row.get('supplier','-')} · {row.get('tanggal','-')}")
+
+        # ── EDIT ──────────────────────────────────────────────────────────────
+        with st.expander("✏️ Edit Transaksi Ini", expanded=False):
             with st.form(f"form_edit_{id_pilih}"):
                 ea, eb, ec = st.columns(3)
                 with ea:
-                    e_tgl  = st.date_input("Tanggal", value=pd.to_datetime(row.get("tanggal", date.today())).date())
+                    e_tgl  = st.date_input("Tanggal",
+                        value=pd.to_datetime(row.get("tanggal", date.today())).date())
                     e_nota = st.text_input("No. Nota", value=str(row.get("no_nota") or ""))
                 with eb:
                     e_sup  = st.text_input("Supplier", value=str(row.get("supplier") or ""))
-                    e_qty  = st.number_input("Qty", value=float(row.get("qty", 0)), min_value=0.0, step=0.5)
+                    kat_n  = row.get("kategori", KATEGORI_OPTIONS[0])
+                    e_kat  = st.selectbox("Kategori", KATEGORI_OPTIONS,
+                        index=KATEGORI_OPTIONS.index(kat_n) if kat_n in KATEGORI_OPTIONS else 0)
                 with ec:
-                    e_hrg = st.number_input("Harga Total (Rp)", value=int(row.get("harga_total", 0)), min_value=0, step=500)
+                    sub_l = SUB_KATEGORI_MAP.get(e_kat, ["Lainnya"])
+                    sub_n = row.get("sub_kategori", sub_l[0])
+                    e_sub = st.selectbox("Sub Kategori", sub_l,
+                        index=sub_l.index(sub_n) if sub_n in sub_l else 0)
+
+                ed, ee, ef = st.columns(3)
+                with ed:
+                    nama_opts = NAMA_BARANG_MAP.get((e_kat, e_sub), ["Lainnya"])
+                    cur_nama  = row.get("nama_barang", "")
+                    nama_idx  = nama_opts.index(cur_nama) if cur_nama in nama_opts else len(nama_opts) - 1
+                    e_nama_sel = st.selectbox("Nama Barang", nama_opts, index=nama_idx,
+                                              key=f"e_nama_{id_pilih}")
+                    if e_nama_sel == "Lainnya":
+                        e_nama = st.text_input("Ketik Nama Barang Baru",
+                            value=cur_nama if cur_nama not in nama_opts else "",
+                            key=f"e_nama_c_{id_pilih}")
+                    else:
+                        e_nama = e_nama_sel
+
+                with ee:
+                    cur_merk = str(row.get("merk") or "")
+                    merk_pre = MERK_MAP.get(e_nama_sel)
+                    if merk_pre:
+                        mk_idx = merk_pre.index(cur_merk) if cur_merk in merk_pre else len(merk_pre) - 1
+                        e_merk_sel = st.selectbox("Merk / Brand", merk_pre, index=mk_idx,
+                                                  key=f"e_merk_{id_pilih}")
+                        if e_merk_sel == "Lainnya":
+                            e_merk = st.text_input("Ketik Merk Baru",
+                                value=cur_merk if cur_merk not in merk_pre else "",
+                                key=f"e_merk_c_{id_pilih}")
+                        else:
+                            e_merk = e_merk_sel
+                    else:
+                        e_merk = st.text_input("Merk / Brand", value=cur_merk,
+                                               key=f"e_merk_f_{id_pilih}")
+
+                with ef:
+                    e_qty  = st.number_input("Qty", value=float(row.get("qty", 0)),
+                                             min_value=0.0, step=0.5)
+                    uom_n  = row.get("uom", UOM_OPTIONS[0])
+                    e_uom  = st.selectbox("UoM", UOM_OPTIONS,
+                        index=UOM_OPTIONS.index(uom_n) if uom_n in UOM_OPTIONS else 0)
+
+                eg, eh = st.columns(2)
+                with eg:
+                    e_hrg = st.number_input("Harga Satuan (Rp)",
+                        value=int(row.get("harga_satuan", 0)), min_value=0, step=500)
+                with eh:
                     st_n  = row.get("status_pembayaran", STATUS_OPTIONS[0])
-                    e_st  = st.selectbox("Status Pembayaran", STATUS_OPTIONS, index=STATUS_OPTIONS.index(st_n) if st_n in STATUS_OPTIONS else 0)
+                    e_st  = st.selectbox("Status Pembayaran", STATUS_OPTIONS,
+                        index=STATUS_OPTIONS.index(st_n) if st_n in STATUS_OPTIONS else 0)
+
+                exp_raw = row.get("tgl_kadaluarsa")
+                exp_v   = pd.to_datetime(exp_raw).date() \
+                          if exp_raw and str(exp_raw) not in ("None", "") else None
+                e_exp   = st.date_input("Tanggal Kadaluarsa", value=exp_v)
+                e_cat   = st.text_area("Catatan", value=str(row.get("catatan") or ""), height=70)
+
+                e_total = e_qty * e_hrg
+                st.info(f"Total Harga: **Rp {e_total:,.0f}**")
 
                 if st.form_submit_button("Simpan Perubahan", type="primary"):
                     ok = update_row(id_pilih, {
                         "tanggal":           e_tgl.isoformat(),
                         "no_nota":           e_nota or None,
                         "supplier":          e_sup,
+                        "kategori":          e_kat,
+                        "sub_kategori":      e_sub,
+                        "nama_barang":       e_nama,
+                        "merk":              e_merk or "-",
                         "qty":               float(e_qty),
-                        "harga_total":       int(e_hrg),
+                        "uom":               e_uom,
+                        "harga_satuan":      int(e_hrg),
+                        "total_harga":       int(e_total),
+                        "tgl_kadaluarsa":    e_exp.isoformat() if e_exp else None,
                         "status_pembayaran": e_st,
+                        "catatan":           e_cat or None,
                     })
                     if ok:
                         st.success("Data berhasil diperbarui!")
                         st.rerun()
 
-            st.divider()
-            konfirm = st.text_input('Ketik HAPUS untuk menghapus permanen data ini')
-            if st.button("Hapus Sekarang", type="primary"):
+        # ── HAPUS ─────────────────────────────────────────────────────────────
+        with st.expander("🗑️ Hapus Transaksi Ini", expanded=False):
+            st.warning(
+                f"Kamu akan menghapus: **{row.get('nama_barang','-')}** "
+                f"dari **{row.get('supplier','-')}**. Tindakan ini tidak bisa dibatalkan."
+            )
+            konfirm = st.text_input('Ketik HAPUS untuk konfirmasi', key="konfirm_hapus")
+            if st.button("Hapus Sekarang", type="primary", key="btn_hapus"):
                 if konfirm.strip().upper() == "HAPUS":
                     ok = delete_row(id_pilih)
                     if ok:
@@ -924,33 +1490,155 @@ def page_administrasi(df: pd.DataFrame):
                 else:
                     st.error('Ketik kata HAPUS (huruf kapital semua) untuk konfirmasi.')
 
+# ─── PAGE: IDENTITAS BARANG ───────────────────────────────────────────────────────
+def page_identitas(df: pd.DataFrame):
+    st.title("🏷️ Identitas Barang")
+
+    if df.empty:
+        empty_state("🏷️", "Belum Ada Barang Tercatat",
+                    "Catat transaksi terlebih dahulu untuk melihat katalog barang.")
+        return
+
+    cf1, cf2 = st.columns(2)
+    with cf1:
+        fil_kat = st.selectbox("Filter Kategori", ["Semua"] + KATEGORI_OPTIONS, key="id_kat")
+    with cf2:
+        cari = st.text_input("Cari Nama Barang / Merk", key="id_cari")
+
+    tampil = df.copy()
+    if fil_kat != "Semua":
+        tampil = tampil[tampil["kategori"] == fil_kat]
+    if cari:
+        tampil = tampil[
+            tampil["nama_barang"].str.contains(cari, case=False, na=False) |
+            tampil["merk"].str.contains(cari, case=False, na=False)
+        ]
+
+    st.markdown("---")
+    st.subheader("📦 Katalog Barang Unik")
+    katalog_cols = [c for c in ["kategori","sub_kategori","nama_barang","merk","grind_size","uom"]
+                    if c in tampil.columns]
+    if not tampil.empty:
+        unik = tampil[katalog_cols].drop_duplicates().sort_values("nama_barang")
+        st.dataframe(unik, use_container_width=True, hide_index=True)
+        st.caption(f"{len(unik)} jenis barang unik")
+    else:
+        st.info("Tidak ada barang sesuai filter.")
+
+    st.markdown("---")
+    col_a, col_b = st.columns(2)
+    with col_a:
+        st.subheader("📊 Transaksi per Sub Kategori")
+        if "sub_kategori" in tampil.columns and not tampil.empty:
+            sub = tampil.groupby(["kategori","sub_kategori"]).size().reset_index(name="Jml Transaksi")
+            st.dataframe(sub.sort_values("Jml Transaksi", ascending=False),
+                         use_container_width=True, hide_index=True)
+
+    with col_b:
+        st.subheader("🔍 Riwayat per Barang")
+        if "nama_barang" in tampil.columns and not tampil.empty:
+            barang_list = sorted(tampil["nama_barang"].dropna().unique().tolist())
+            pilih = st.selectbox("Pilih Barang", barang_list, key="id_barang")
+            detail = tampil[tampil["nama_barang"] == pilih]
+            st.write(f"**{len(detail)} transaksi** untuk *{pilih}*")
+            dc = [c for c in ["tanggal","supplier","merk","qty","uom",
+                               "harga_satuan","total_harga","status_pembayaran"]
+                  if c in detail.columns]
+            st.dataframe(detail[dc], use_container_width=True, hide_index=True)
+
+# ─── PAGE: DETAIL STOK ───────────────────────────────────────────────────────────
+def page_detail_stok(df: pd.DataFrame):
+    st.title("📦 Detail Stok")
+
+    if df.empty:
+        empty_state("📦", "Belum Ada Data Stok",
+                    "Data stok muncul otomatis setelah transaksi dicatat.")
+        return
+
+    df["qty"]          = pd.to_numeric(df["qty"],          errors="coerce").fillna(0)
+    df["harga_satuan"] = pd.to_numeric(df["harga_satuan"], errors="coerce").fillna(0)
+    df["total_harga"]  = pd.to_numeric(df["total_harga"],  errors="coerce").fillna(0)
+
+    st.subheader("💰 Ringkasan Finansial")
+    c1, c2, c3, c4 = st.columns(4)
+    c1.metric("Total Pengeluaran",       f"Rp {df['total_harga'].sum():,.0f}")
+    c2.metric("Rata-rata per Transaksi", f"Rp {df['total_harga'].mean():,.0f}")
+    c3.metric("Transaksi Terbesar",      f"Rp {df['total_harga'].max():,.0f}")
+    c4.metric("Jenis Barang Unik",       df["nama_barang"].nunique() if "nama_barang" in df.columns else 0)
+
+    st.markdown("---")
+    col_kiri, col_kanan = st.columns(2)
+    with col_kiri:
+        st.subheader("📊 Akumulasi Stok per Barang")
+        if "nama_barang" in df.columns:
+            grp = df.groupby(["nama_barang","uom"]).agg(
+                Total_Qty     =("qty",          "sum"),
+                Total_Spend   =("total_harga",  "sum"),
+                Rata_Harga    =("harga_satuan", "mean"),
+                Jml_Transaksi =("total_harga",  "count"),
+            ).reset_index()
+            grp.columns = ["Nama Barang","UoM","Total Qty",
+                           "Total Spend (Rp)","Rata-rata Harga (Rp)","Jml Transaksi"]
+            st.dataframe(grp.sort_values("Total Spend (Rp)", ascending=False),
+                         use_container_width=True, hide_index=True)
+
+    with col_kanan:
+        st.subheader("📈 Tren Harga Satuan")
+        if "nama_barang" in df.columns and not df.empty:
+            pilih = st.selectbox("Pilih barang", sorted(df["nama_barang"].dropna().unique()),
+                                 key="tren_pilih")
+            tren = df[df["nama_barang"] == pilih][["tanggal","harga_satuan"]].copy()
+            tren["tanggal"] = pd.to_datetime(tren["tanggal"], errors="coerce")
+            tren = tren.dropna().sort_values("tanggal")
+            if len(tren) >= 2:
+                st.line_chart(tren.rename(columns={"tanggal":"Tanggal",
+                                                   "harga_satuan":"Harga Satuan (Rp)"})
+                                  .set_index("Tanggal"))
+            elif len(tren) == 1:
+                st.info("Baru 1 catatan harga. Butuh minimal 2 untuk tampilkan tren.")
+            else:
+                st.info("Tidak ada data harga.")
+
+    st.markdown("---")
+    st.subheader("🗓️ Pengeluaran per Bulan")
+    if "tanggal" in df.columns:
+        df["bulan"] = pd.to_datetime(df["tanggal"], errors="coerce").dt.to_period("M").astype(str)
+        monthly = df.groupby("bulan")["total_harga"].sum().reset_index()
+        monthly.columns = ["Bulan", "Total (Rp)"]
+        if not monthly.empty:
+            st.bar_chart(monthly.sort_values("Bulan").set_index("Bulan"))
 
 # ─── PAGE: KONTROL & AUDIT ────────────────────────────────────────────────────────
 def page_kontrol_audit(df: pd.DataFrame):
     st.title("🔍 Kontrol & Audit")
 
     if df.empty:
-        empty_state("🔍", "Belum Ada Data", "Data muncul setelah transaksi dicatat.")
+        empty_state("🔍", "Belum Ada Data untuk Diaudit",
+                    "Data audit muncul setelah transaksi dicatat.")
         return
 
-    df["harga_total"] = pd.to_numeric(df["harga_total"], errors="coerce").fillna(0)
+    df["total_harga"] = pd.to_numeric(df["total_harga"], errors="coerce").fillna(0)
 
     tab_exp, tab_kas, tab_log = st.tabs([
-        "⚠️ Peringatan Kadaluarsa",
+        "⏰ Monitor Kadaluarsa",
         "💳 Arus Kas & Hutang",
         "📋 Audit Log",
     ])
 
     # ── KADALUARSA ───────────────────────────────────────────────────────────────
     with tab_exp:
-        st.subheader("📅 Status Peringatan Kadaluarsa")
+        st.subheader("📅 Status Kadaluarsa Barang")
         if "tgl_kadaluarsa" not in df.columns:
             st.info("Kolom kadaluarsa tidak tersedia.")
         else:
-            df_exp = df[df["tgl_kadaluarsa"].notna() & (df["tgl_kadaluarsa"].astype(str).str.strip().isin(["", "None"]) == False)].copy()
+            df_exp = df[
+                df["tgl_kadaluarsa"].notna() &
+                (df["tgl_kadaluarsa"].astype(str).str.strip().isin(["", "None"]) == False)
+            ].copy()
 
             if df_exp.empty:
-                empty_state("📅", "Aman", "Belum ada item bahan baku yang didaftarkan tanggal kadaluarsanya.")
+                empty_state("📅", "Belum Ada Data Kadaluarsa",
+                            "Isi kolom Tanggal Kadaluarsa saat mencatat transaksi bahan baku.")
             else:
                 df_exp["tgl_kadaluarsa"] = pd.to_datetime(df_exp["tgl_kadaluarsa"], errors="coerce")
                 today    = pd.Timestamp.today().normalize()
@@ -962,69 +1650,89 @@ def page_kontrol_audit(df: pd.DataFrame):
                 aman = df_exp[df_exp["tgl_kadaluarsa"] > today + pd.Timedelta(days=30)]
 
                 c1, c2, c3 = st.columns(3)
-                c1.metric("🔴 Kritis (≤7 hari)", len(kritis))
+                c1.metric("🔴 Kritis (≤7 hari)",    len(kritis))
                 c2.metric("🟡 Mendekat (8–30 hari)", len(mendekat))
-                c3.metric("🟢 Aman (>30 hari)", len(aman))
+                c3.metric("🟢 Aman (>30 hari)",      len(aman))
 
-                exp_cols = [c for c in ["nama_barang","merk","qty","uom_qty","tgl_kadaluarsa","catatan"] if c in df_exp.columns]
-                
+                exp_cols = [c for c in ["nama_barang","merk","qty","uom","tgl_kadaluarsa","catatan"]
+                            if c in df_exp.columns]
                 if not kritis.empty:
                     st.error("🚨 Barang Kritis — Segera Pakai atau Retur ke Supplier!")
-                    st.dataframe(kritis[exp_cols].sort_values("tgl_kadaluarsa"), use_container_width=True, hide_index=True)
+                    st.dataframe(kritis[exp_cols].sort_values("tgl_kadaluarsa"),
+                                 use_container_width=True, hide_index=True)
                 if not mendekat.empty:
                     st.warning("⚠️ Akan Kadaluarsa dalam 30 Hari")
-                    st.dataframe(mendekat[exp_cols].sort_values("tgl_kadaluarsa"), use_container_width=True, hide_index=True)
+                    st.dataframe(mendekat[exp_cols].sort_values("tgl_kadaluarsa"),
+                                 use_container_width=True, hide_index=True)
+                if not aman.empty:
+                    with st.expander(f"✅ Barang Aman ({len(aman)} item)"):
+                        st.dataframe(aman[exp_cols].sort_values("tgl_kadaluarsa"),
+                                     use_container_width=True, hide_index=True)
 
     # ── ARUS KAS ─────────────────────────────────────────────────────────────────
     with tab_kas:
-        st.subheader("💸 Pengawasan Arus Kas Keluar")
-        total_all    = df["harga_total"].sum()
-        total_lunas  = df[df["status_pembayaran"] == "Lunas"]["harga_total"].sum()
-        total_hutang = df[df["status_pembayaran"].str.contains("Tempo|DP", na=False)]["harga_total"].sum()
+        st.subheader("💸 Ringkasan Arus Kas Keluar")
+        total_all    = df["total_harga"].sum()
+        total_lunas  = df[df["status_pembayaran"] == "Lunas"]["total_harga"].sum()
+        total_hutang = df[df["status_pembayaran"].str.contains("Tempo|DP", na=False)]["total_harga"].sum()
 
         c1, c2, c3 = st.columns(3)
-        c1.metric("Total Pembelian", f"Rp {total_all:,.0f}")
-        c2.metric("✅ Sudah Lunas", f"Rp {total_lunas:,.0f}")
-        c3.metric("⏳ Belum Lunas / Hutang", f"Rp {total_hutang:,.0f}")
+        c1.metric("Total Keluar",             f"Rp {total_all:,.0f}")
+        c2.metric("✅ Sudah Lunas",            f"Rp {total_lunas:,.0f}")
+        c3.metric("⏳ Belum Lunas / Hutang",  f"Rp {total_hutang:,.0f}")
 
         st.markdown("---")
-        st.subheader("📋 Transaksi Membutuhkan Pelunasan (Hutang/Tempo)")
+        st.subheader("📋 Transaksi Belum Lunas")
         belum = df[df["status_pembayaran"] != "Lunas"]
         if not belum.empty:
-            bl_cols = [c for c in ["tanggal","no_nota","supplier","nama_barang","harga_total","status_pembayaran"] if c in belum.columns]
+            bl_cols = [c for c in ["tanggal","no_nota","supplier","nama_barang",
+                                   "total_harga","status_pembayaran","catatan"]
+                       if c in belum.columns]
             bl_sorted = belum[bl_cols].sort_values("tanggal") if "tanggal" in belum.columns else belum[bl_cols]
             st.dataframe(bl_sorted, use_container_width=True, hide_index=True)
+            st.caption(f"Total hutang: **Rp {total_hutang:,.0f}**")
         else:
             st.success("Semua transaksi sudah berstatus Lunas!")
 
+        if st.session_state.role == "manager":
+            st.markdown("---")
+            st.subheader("📊 Pengeluaran per Supplier")
+            sup_grp = df.groupby(["supplier","status_pembayaran"])["total_harga"].sum().reset_index()
+            sup_grp.columns = ["Supplier","Status","Total (Rp)"]
+            st.dataframe(sup_grp.sort_values("Total (Rp)", ascending=False),
+                         use_container_width=True, hide_index=True)
+
     # ── AUDIT LOG ────────────────────────────────────────────────────────────────
     with tab_log:
-        st.subheader("📋 Log Keseluruhan")
+        st.subheader("📋 Log Seluruh Transaksi")
 
         lf1, lf2, lf3 = st.columns(3)
         with lf1:
             kat_f  = st.selectbox("Kategori", ["Semua"] + KATEGORI_OPTIONS, key="log_kat")
         with lf2:
-            sort_f = st.selectbox("Urutkan", ["tanggal","harga_total","supplier","nama_barang"], key="log_sort")
+            sort_f = st.selectbox("Urutkan", ["tanggal","total_harga","supplier","nama_barang"],
+                                  key="log_sort")
         with lf3:
             asc_f  = st.selectbox("Urutan", ["Terbaru dulu","Terlama dulu"], key="log_asc")
 
         log_df = df.copy()
-        if kat_f != "Semua": log_df = log_df[log_df["kategori"] == kat_f]
+        if kat_f != "Semua":
+            log_df = log_df[log_df["kategori"] == kat_f]
         if sort_f in log_df.columns:
             log_df = log_df.sort_values(sort_f, ascending=(asc_f == "Terlama dulu"))
 
         st.dataframe(log_df, use_container_width=True, hide_index=True)
+        st.caption(f"{len(log_df)} catatan ditampilkan")
 
         if st.session_state.role == "manager":
+            st.markdown("---")
             csv = log_df.to_csv(index=False).encode("utf-8")
             st.download_button(
-                label="⬇️ Export Data ke CSV",
+                label="⬇️ Export CSV",
                 data=csv,
-                file_name=f"audit_log_{st.session_state.cabang}_{date.today()}.csv",
+                file_name=f"inventaris_{st.session_state.cabang}_{date.today()}.csv",
                 mime="text/csv",
             )
-
 
 # ─── MAIN ────────────────────────────────────────────────────────────────────────
 def main():
@@ -1035,9 +1743,11 @@ def main():
     page = show_sidebar()
     df   = get_data(st.session_state.cabang)
 
-    if   page == "📊 Dashboard":       page_dashboard(df)
-    elif page == "📋 Administrasi":    page_administrasi(df)
-    elif page == "🔍 Kontrol & Audit": page_kontrol_audit(df)
+    if   page == "📊 Dashboard":        page_dashboard(df)
+    elif page == "📋 Administrasi":     page_administrasi(df)
+    elif page == "🏷️ Identitas Barang": page_identitas(df)
+    elif page == "📦 Detail Stok":      page_detail_stok(df)
+    elif page == "🔍 Kontrol & Audit":  page_kontrol_audit(df)
 
 if __name__ == "__main__":
     main()
