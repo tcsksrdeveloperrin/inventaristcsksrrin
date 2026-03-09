@@ -268,105 +268,321 @@ GRIND_OPTIONS  = ["-", "Whole Bean", "V60 (5-6)", "Vietnam Drip (3-4)", "Espress
 STATUS_OPTIONS = ["Lunas", "Tempo (Hutang)", "DP/Uang Muka"]
 
 # ─── SHELF LIFE MAP ──────────────────────────────────────────────────────────────
-# Produk yang TIDAK memiliki expired date di kemasan → estimasi otomatis per metode simpan.
-# Format: { nama_barang: { metode_simpan: (hari_min, hari_max, label) } }
-METODE_SIMPAN_OPTIONS = ["Pilih metode penyimpanan...", "Suhu Ruang", "Kulkas / Pendingin", "Freezer", "Wadah Kering / Kedap Udara"]
+# Produk yang TIDAK atau MUNGKIN TIDAK memiliki expired date di kemasan.
+# Program menghitung estimasi otomatis berdasarkan metode penyimpanan.
+# Format: { nama_barang: { metode_simpan: (hari_min, hari_max, keterangan) } }
+
+METODE_SIMPAN_OPTIONS = [
+    "Pilih metode penyimpanan...",
+    "Suhu Ruang",
+    "Kulkas (1–4 °C)",
+    "Pendingin / Chiller (4–10 °C)",
+    "Freezer (≤ −18 °C)",
+    "Wadah Kering / Kedap Udara",
+]
 
 SHELF_LIFE_MAP = {
-    # ── BAHAN BAKU MAKANAN ──
+
+    # ══════════════════════════════════════════════════════════════════════════
+    # BAHAN BAKU MAKANAN — Protein
+    # ══════════════════════════════════════════════════════════════════════════
     "Telur Ayam": {
-        "Suhu Ruang":                (7,  21,  "1–3 minggu (suhu ruang)"),
-        "Kulkas / Pendingin":        (21, 35,  "3–5 minggu (kulkas)"),
-        "Freezer":                   (90, 365, "3–12 bulan (freezer, sudah dikocok)"),
+        "Suhu Ruang":               (7,  21,  "1–3 minggu · suhu ruang"),
+        "Kulkas (1–4 °C)":          (28, 42,  "4–6 minggu · kulkas"),
+        "Pendingin / Chiller (4–10 °C)": (21, 35, "3–5 minggu · chiller"),
+        "Freezer (≤ −18 °C)":       (90, 365, "3–12 bulan · freezer (sudah dikocok/dipisah)"),
     },
     "Ayam Fillet / Ayam Potong": {
-        "Suhu Ruang":                (0,  1,   "Maks 2 jam (suhu ruang — segera masak)"),
-        "Kulkas / Pendingin":        (1,  2,   "1–2 hari (kulkas)"),
-        "Freezer":                   (90, 270, "3–9 bulan (freezer)"),
+        "Suhu Ruang":               (0,  0,   "Maks 2 jam · suhu ruang — segera masak!"),
+        "Kulkas (1–4 °C)":          (1,  2,   "1–2 hari · kulkas"),
+        "Pendingin / Chiller (4–10 °C)": (1,  1, "Maks 1 hari · chiller"),
+        "Freezer (≤ −18 °C)":       (90, 270, "3–9 bulan · freezer"),
     },
     "Daging Kambing": {
-        "Kulkas / Pendingin":        (3,  5,   "3–5 hari (kulkas)"),
-        "Freezer":                   (90, 180, "3–6 bulan (freezer)"),
+        "Kulkas (1–4 °C)":          (3,  5,   "3–5 hari · kulkas"),
+        "Pendingin / Chiller (4–10 °C)": (2, 3,  "2–3 hari · chiller"),
+        "Freezer (≤ −18 °C)":       (90, 180, "3–6 bulan · freezer"),
     },
     "Ikan Jambal Roti": {
-        "Suhu Ruang":                (14, 30,  "2–4 minggu (suhu ruang, sudah dikeringkan)"),
-        "Kulkas / Pendingin":        (30, 60,  "1–2 bulan (kulkas)"),
-        "Freezer":                   (90, 180, "3–6 bulan (freezer)"),
+        "Suhu Ruang":               (14, 30,  "2–4 minggu · suhu ruang (sudah dikeringkan/diasin)"),
+        "Kulkas (1–4 °C)":          (30, 60,  "1–2 bulan · kulkas"),
+        "Pendingin / Chiller (4–10 °C)": (20, 45, "3–6 minggu · chiller"),
+        "Freezer (≤ −18 °C)":       (90, 180, "3–6 bulan · freezer"),
+        "Wadah Kering / Kedap Udara": (30, 60, "1–2 bulan · suhu ruang wadah kedap udara"),
     },
     "Tahu Putih / Tahu Goreng": {
-        "Suhu Ruang":                (1,  1,   "Maks 1 hari (suhu ruang)"),
-        "Kulkas / Pendingin":        (3,  5,   "3–5 hari (kulkas, rendam air ganti tiap hari)"),
+        "Suhu Ruang":               (0,  1,   "Maks 1 hari · suhu ruang"),
+        "Kulkas (1–4 °C)":          (3,  5,   "3–5 hari · kulkas (rendam air, ganti tiap hari)"),
+        "Pendingin / Chiller (4–10 °C)": (2, 3,  "2–3 hari · chiller"),
+        "Freezer (≤ −18 °C)":       (30, 60,  "1–2 bulan · freezer (tekstur berubah, cocok untuk dimasak)"),
     },
     "Tempe": {
-        "Suhu Ruang":                (1,  2,   "1–2 hari (suhu ruang)"),
-        "Kulkas / Pendingin":        (5,  7,   "5–7 hari (kulkas)"),
-        "Freezer":                   (90, 180, "3–6 bulan (freezer)"),
+        "Suhu Ruang":               (1,  2,   "1–2 hari · suhu ruang"),
+        "Kulkas (1–4 °C)":          (5,  7,   "5–7 hari · kulkas"),
+        "Pendingin / Chiller (4–10 °C)": (3, 5,  "3–5 hari · chiller"),
+        "Freezer (≤ −18 °C)":       (90, 180, "3–6 bulan · freezer"),
     },
     "Oncom": {
-        "Suhu Ruang":                (1,  2,   "1–2 hari (suhu ruang)"),
-        "Kulkas / Pendingin":        (3,  5,   "3–5 hari (kulkas)"),
+        "Suhu Ruang":               (1,  2,   "1–2 hari · suhu ruang"),
+        "Kulkas (1–4 °C)":          (4,  6,   "4–6 hari · kulkas"),
+        "Pendingin / Chiller (4–10 °C)": (2, 4,  "2–4 hari · chiller"),
+        "Freezer (≤ −18 °C)":       (60, 90,  "2–3 bulan · freezer"),
     },
     "Bakso": {
-        "Kulkas / Pendingin":        (3,  5,   "3–5 hari (kulkas)"),
-        "Freezer":                   (30, 90,  "1–3 bulan (freezer)"),
+        "Kulkas (1–4 °C)":          (3,  5,   "3–5 hari · kulkas"),
+        "Pendingin / Chiller (4–10 °C)": (2, 3,  "2–3 hari · chiller"),
+        "Freezer (≤ −18 °C)":       (30, 90,  "1–3 bulan · freezer"),
     },
     "Seafood Mix (Cumi, Udang, dll)": {
-        "Kulkas / Pendingin":        (1,  2,   "1–2 hari (kulkas)"),
-        "Freezer":                   (90, 180, "3–6 bulan (freezer)"),
+        "Kulkas (1–4 °C)":          (1,  2,   "1–2 hari · kulkas"),
+        "Pendingin / Chiller (4–10 °C)": (0, 1,  "Maks 1 hari · chiller"),
+        "Freezer (≤ −18 °C)":       (90, 180, "3–6 bulan · freezer"),
     },
-    "Pisang Kepok / Cavendish": {
-        "Suhu Ruang":                (3,  7,   "3–7 hari (suhu ruang, tergantung kematangan)"),
-        "Kulkas / Pendingin":        (7,  14,  "1–2 minggu (kulkas, kulit menghitam normal)"),
+    "Abon Sapi / Abon Ayam": {
+        "Suhu Ruang":               (30, 60,  "1–2 bulan · suhu ruang (kemasan belum dibuka)"),
+        "Kulkas (1–4 °C)":          (60, 90,  "2–3 bulan · kulkas (kemasan terbuka)"),
+        "Wadah Kering / Kedap Udara": (30, 60, "1–2 bulan · wadah kedap udara"),
     },
-    "Kol / Kubis": {
-        "Suhu Ruang":                (3,  5,   "3–5 hari (suhu ruang)"),
-        "Kulkas / Pendingin":        (14, 21,  "2–3 minggu (kulkas)"),
-    },
-    "Sayuran Capcay (Wortel, Sawi, Jagung muda, dll)": {
-        "Suhu Ruang":                (1,  2,   "1–2 hari (suhu ruang)"),
-        "Kulkas / Pendingin":        (5,  7,   "5–7 hari (kulkas)"),
-    },
-    "Lemon Segar": {
-        "Suhu Ruang":                (7,  14,  "1–2 minggu (suhu ruang)"),
-        "Kulkas / Pendingin":        (21, 42,  "3–6 minggu (kulkas)"),
-    },
-    # ── BAHAN BAKU MINUMAN ──
-    "Beans Natural": {
-        "Suhu Ruang":                (14, 30,  "2–4 minggu setelah roasting (suhu ruang, kedap udara)"),
-        "Wadah Kering / Kedap Udara":(30, 60,  "1–2 bulan (wadah kedap udara)"),
-    },
-    "Adonan Surabi (Tepung Beras + Santan)": {
-        "Kulkas / Pendingin":        (1,  2,   "1–2 hari (kulkas)"),
-        "Freezer":                   (7,  14,  "1–2 minggu (freezer)"),
-    },
-    "Sambal": {
-        "Suhu Ruang":                (1,  1,   "Maks 1 hari (suhu ruang)"),
-        "Kulkas / Pendingin":        (5,  7,   "5–7 hari (kulkas)"),
-        "Freezer":                   (30, 60,  "1–2 bulan (freezer)"),
-    },
-    "Cuko Pempek": {
-        "Suhu Ruang":                (1,  2,   "1–2 hari (suhu ruang)"),
-        "Kulkas / Pendingin":        (7,  14,  "1–2 minggu (kulkas)"),
-    },
-    "Serundeng Kelapa": {
-        "Suhu Ruang":                (7,  14,  "1–2 minggu (suhu ruang, wadah tertutup)"),
-        "Wadah Kering / Kedap Udara":(14, 30,  "2–4 minggu (wadah kedap udara)"),
-    },
-    "Risoles": {
-        "Kulkas / Pendingin":        (2,  3,   "2–3 hari (kulkas, belum digoreng)"),
-        "Freezer":                   (30, 60,  "1–2 bulan (freezer, belum digoreng)"),
-    },
-    "Simple Syrup (Gula Cair)": {
-        "Suhu Ruang":                (14, 30,  "2–4 minggu (suhu ruang, botol steril tertutup)"),
-        "Kulkas / Pendingin":        (30, 60,  "1–2 bulan (kulkas)"),
+    "Sosis Ayam / Sosis Sapi": {
+        "Kulkas (1–4 °C)":          (3,  7,   "3–7 hari · kulkas (kemasan dibuka)"),
+        "Pendingin / Chiller (4–10 °C)": (2, 5,  "2–5 hari · chiller"),
+        "Freezer (≤ −18 °C)":       (30, 60,  "1–2 bulan · freezer"),
     },
     "Pempek Original": {
-        "Kulkas / Pendingin":        (3,  5,   "3–5 hari (kulkas)"),
-        "Freezer":                   (30, 90,  "1–3 bulan (freezer)"),
+        "Suhu Ruang":               (0,  1,   "Maks 1 hari · suhu ruang (sudah dimasak)"),
+        "Kulkas (1–4 °C)":          (3,  5,   "3–5 hari · kulkas"),
+        "Pendingin / Chiller (4–10 °C)": (2, 3,  "2–3 hari · chiller"),
+        "Freezer (≤ −18 °C)":       (30, 90,  "1–3 bulan · freezer (mentah/setengah matang)"),
     },
     "Pempek Kapal Selam": {
-        "Kulkas / Pendingin":        (3,  5,   "3–5 hari (kulkas)"),
-        "Freezer":                   (30, 90,  "1–3 bulan (freezer)"),
+        "Suhu Ruang":               (0,  1,   "Maks 1 hari · suhu ruang (sudah dimasak)"),
+        "Kulkas (1–4 °C)":          (3,  5,   "3–5 hari · kulkas"),
+        "Pendingin / Chiller (4–10 °C)": (2, 3,  "2–3 hari · chiller"),
+        "Freezer (≤ −18 °C)":       (30, 90,  "1–3 bulan · freezer (mentah/setengah matang)"),
+    },
+    "Risoles": {
+        "Kulkas (1–4 °C)":          (2,  3,   "2–3 hari · kulkas (mentah, belum digoreng)"),
+        "Pendingin / Chiller (4–10 °C)": (1, 2,  "1–2 hari · chiller"),
+        "Freezer (≤ −18 °C)":       (30, 60,  "1–2 bulan · freezer (mentah, belum digoreng)"),
+    },
+
+    # ══════════════════════════════════════════════════════════════════════════
+    # BAHAN BAKU MAKANAN — Fresh & Produce
+    # ══════════════════════════════════════════════════════════════════════════
+    "Beras (Nasi Putih)": {
+        "Suhu Ruang":               (180, 365, "6–12 bulan · suhu ruang (beras mentah, wadah tertutup)"),
+        "Wadah Kering / Kedap Udara": (365, 730, "1–2 tahun · wadah kedap udara"),
+    },
+    "Kwetiau / Mie Kwetiau": {
+        "Suhu Ruang":               (1,  2,   "1–2 hari · suhu ruang (kwetiau basah segar)"),
+        "Kulkas (1–4 °C)":          (3,  5,   "3–5 hari · kulkas (kwetiau basah)"),
+        "Pendingin / Chiller (4–10 °C)": (2, 3,  "2–3 hari · chiller"),
+        "Freezer (≤ −18 °C)":       (30, 90,  "1–3 bulan · freezer"),
+    },
+    "Kol / Kubis": {
+        "Suhu Ruang":               (3,  5,   "3–5 hari · suhu ruang"),
+        "Kulkas (1–4 °C)":          (14, 21,  "2–3 minggu · kulkas"),
+        "Pendingin / Chiller (4–10 °C)": (10, 18, "10–18 hari · chiller"),
+    },
+    "Pisang Kepok / Cavendish": {
+        "Suhu Ruang":               (3,  7,   "3–7 hari · suhu ruang (tergantung kematangan)"),
+        "Kulkas (1–4 °C)":          (7,  14,  "1–2 minggu · kulkas (kulit menghitam, daging tetap baik)"),
+        "Pendingin / Chiller (4–10 °C)": (5, 10, "5–10 hari · chiller"),
+    },
+    "Kentang": {
+        "Suhu Ruang":               (14, 30,  "2–4 minggu · suhu ruang (tempat gelap & kering)"),
+        "Kulkas (1–4 °C)":          (30, 60,  "1–2 bulan · kulkas"),
+        "Pendingin / Chiller (4–10 °C)": (21, 45, "3–6 minggu · chiller"),
+        "Wadah Kering / Kedap Udara": (30, 60, "1–2 bulan · tempat gelap kering"),
+    },
+    "Sayuran Capcay (Wortel, Sawi, Jagung muda, dll)": {
+        "Suhu Ruang":               (1,  2,   "1–2 hari · suhu ruang"),
+        "Kulkas (1–4 °C)":          (5,  7,   "5–7 hari · kulkas"),
+        "Pendingin / Chiller (4–10 °C)": (3, 5,  "3–5 hari · chiller"),
+        "Freezer (≤ −18 °C)":       (90, 180, "3–6 bulan · freezer (sudah di-blanching)"),
+    },
+
+    # ══════════════════════════════════════════════════════════════════════════
+    # BAHAN BAKU MAKANAN — Adonan & Tepung
+    # ══════════════════════════════════════════════════════════════════════════
+    "Adonan Surabi (Tepung Beras + Santan)": {
+        "Kulkas (1–4 °C)":          (1,  2,   "1–2 hari · kulkas"),
+        "Pendingin / Chiller (4–10 °C)": (0, 1,  "Maks 1 hari · chiller"),
+        "Freezer (≤ −18 °C)":       (7,  14,  "1–2 minggu · freezer"),
+    },
+    "Beras Ketan": {
+        "Suhu Ruang":               (180, 365, "6–12 bulan · suhu ruang (mentah, kering)"),
+        "Wadah Kering / Kedap Udara": (365, 730, "1–2 tahun · wadah kedap udara"),
+    },
+    "Tepung Terigu": {
+        "Suhu Ruang":               (180, 365, "6–12 bulan · suhu ruang (kemasan tertutup)"),
+        "Wadah Kering / Kedap Udara": (365, 548, "1–1,5 tahun · wadah kedap udara"),
+    },
+
+    # ══════════════════════════════════════════════════════════════════════════
+    # BAHAN BAKU MAKANAN — Dairy & Topping
+    # ══════════════════════════════════════════════════════════════════════════
+    "Keju Cheddar": {
+        "Kulkas (1–4 °C)":          (14, 30,  "2–4 minggu · kulkas (kemasan dibuka)"),
+        "Pendingin / Chiller (4–10 °C)": (7, 14, "1–2 minggu · chiller"),
+        "Freezer (≤ −18 °C)":       (60, 180, "2–6 bulan · freezer (tekstur sedikit berubah)"),
+    },
+    "Keju Mozarella": {
+        "Kulkas (1–4 °C)":          (7,  21,  "1–3 minggu · kulkas"),
+        "Pendingin / Chiller (4–10 °C)": (5, 14, "5–14 hari · chiller"),
+        "Freezer (≤ −18 °C)":       (30, 90,  "1–3 bulan · freezer"),
+    },
+    "Meses / Cokelat Serut": {
+        "Suhu Ruang":               (180, 365, "6–12 bulan · suhu ruang (kemasan tertutup, tempat sejuk)"),
+        "Wadah Kering / Kedap Udara": (180, 365, "6–12 bulan · wadah kedap udara"),
+    },
+    "Pasta Cokelat / Dark Chocolate": {
+        "Suhu Ruang":               (90, 180,  "3–6 bulan · suhu ruang (sejuk, tidak kena sinar langsung)"),
+        "Kulkas (1–4 °C)":          (180, 365, "6–12 bulan · kulkas"),
+        "Wadah Kering / Kedap Udara": (120, 240, "4–8 bulan · wadah kedap udara"),
+    },
+
+    # ══════════════════════════════════════════════════════════════════════════
+    # BAHAN BAKU MAKANAN — Bumbu & Pelengkap
+    # ══════════════════════════════════════════════════════════════════════════
+    "Bawang Merah & Bawang Putih": {
+        "Suhu Ruang":               (14, 30,  "2–4 minggu · suhu ruang (tempat kering & sirkulasi udara baik)"),
+        "Kulkas (1–4 °C)":          (30, 60,  "1–2 bulan · kulkas (sudah dikupas, wadah tertutup)"),
+        "Pendingin / Chiller (4–10 °C)": (21, 45, "3–6 minggu · chiller"),
+        "Wadah Kering / Kedap Udara": (30, 60, "1–2 bulan · kering & gelap"),
+    },
+    "Bawang Goreng Crispy": {
+        "Suhu Ruang":               (14, 30,  "2–4 minggu · suhu ruang (wadah tertutup rapat)"),
+        "Wadah Kering / Kedap Udara": (30, 60, "1–2 bulan · wadah kedap udara"),
+    },
+    "Sambal": {
+        "Suhu Ruang":               (0,  1,   "Maks 1 hari · suhu ruang (sambal segar/homemade)"),
+        "Kulkas (1–4 °C)":          (5,  7,   "5–7 hari · kulkas"),
+        "Pendingin / Chiller (4–10 °C)": (3, 5,  "3–5 hari · chiller"),
+        "Freezer (≤ −18 °C)":       (30, 60,  "1–2 bulan · freezer"),
+    },
+    "Saus Tomat": {
+        "Suhu Ruang":               (7,  14,  "1–2 minggu · suhu ruang (botol dibuka)"),
+        "Kulkas (1–4 °C)":          (30, 45,  "1–1,5 bulan · kulkas (botol dibuka)"),
+        "Pendingin / Chiller (4–10 °C)": (21, 35, "3–5 minggu · chiller"),
+    },
+    "Saus Hot / Saus Pedas": {
+        "Suhu Ruang":               (14, 30,  "2–4 minggu · suhu ruang (botol dibuka)"),
+        "Kulkas (1–4 °C)":          (60, 90,  "2–3 bulan · kulkas (botol dibuka)"),
+        "Pendingin / Chiller (4–10 °C)": (30, 60, "1–2 bulan · chiller"),
+    },
+    "Cuko Pempek": {
+        "Suhu Ruang":               (1,  2,   "1–2 hari · suhu ruang (homemade)"),
+        "Kulkas (1–4 °C)":          (7,  14,  "1–2 minggu · kulkas"),
+        "Pendingin / Chiller (4–10 °C)": (5, 10, "5–10 hari · chiller"),
+        "Freezer (≤ −18 °C)":       (60, 90,  "2–3 bulan · freezer"),
+    },
+    "Serundeng Kelapa": {
+        "Suhu Ruang":               (7,  14,  "1–2 minggu · suhu ruang (wadah tertutup)"),
+        "Kulkas (1–4 °C)":          (21, 30,  "3–4 minggu · kulkas"),
+        "Wadah Kering / Kedap Udara": (14, 30, "2–4 minggu · wadah kedap udara"),
+    },
+    "Minyak Goreng": {
+        "Suhu Ruang":               (180, 365, "6–12 bulan · suhu ruang (botol belum dibuka)"),
+        "Wadah Kering / Kedap Udara": (90, 180, "3–6 bulan · setelah dibuka (jauhkan dari panas & cahaya)"),
+    },
+    "Garam, Gula Pasir, Kecap Manis, Merica": {
+        "Suhu Ruang":               (365, 730, "1–2 tahun · suhu ruang (tempat kering)"),
+        "Wadah Kering / Kedap Udara": (730, 1095, "2–3 tahun · wadah kedap udara"),
+    },
+
+    # ══════════════════════════════════════════════════════════════════════════
+    # BAHAN BAKU MINUMAN
+    # ══════════════════════════════════════════════════════════════════════════
+    "Beans Natural": {
+        "Suhu Ruang":               (14, 30,  "2–4 minggu setelah roasting · suhu ruang (kedap udara)"),
+        "Kulkas (1–4 °C)":          (30, 60,  "1–2 bulan · kulkas (wadah kedap udara, hindari kelembapan)"),
+        "Freezer (≤ −18 °C)":       (90, 180, "3–6 bulan · freezer (wadah kedap udara, 1x beku jangan dicairkan ulang)"),
+        "Wadah Kering / Kedap Udara": (21, 60, "3–8 minggu · wadah kedap udara suhu ruang"),
+    },
+    "Espresso Shot": {
+        "Suhu Ruang":               (0, 0,    "Konsumsi segera · espresso shot hanya tahan 20–30 detik"),
+    },
+    "Susu Full Cream": {
+        "Kulkas (1–4 °C)":          (5,  7,   "5–7 hari · kulkas (susu segar setelah dibuka)"),
+        "Pendingin / Chiller (4–10 °C)": (3, 5,  "3–5 hari · chiller"),
+    },
+    "Susu UHT Full Cream": {
+        "Suhu Ruang":               (180, 270, "6–9 bulan · suhu ruang (belum dibuka, cek kemasan)"),
+        "Kulkas (1–4 °C)":          (5,  7,   "5–7 hari · kulkas (setelah dibuka)"),
+        "Pendingin / Chiller (4–10 °C)": (3, 5, "3–5 hari · chiller (setelah dibuka)"),
+    },
+    "SKM (Susu Kental Manis)": {
+        "Suhu Ruang":               (14, 30,  "2–4 minggu · suhu ruang (kaleng/sachet dibuka, pindah ke wadah tertutup)"),
+        "Kulkas (1–4 °C)":          (14, 21,  "2–3 minggu · kulkas (sudah dibuka)"),
+    },
+    "Creamer Cair / Krim Masak": {
+        "Kulkas (1–4 °C)":          (7,  14,  "1–2 minggu · kulkas (setelah dibuka)"),
+        "Pendingin / Chiller (4–10 °C)": (5, 10, "5–10 hari · chiller"),
+        "Freezer (≤ −18 °C)":       (90, 180, "3–6 bulan · freezer"),
+    },
+    "Powder Hazelnut": {
+        "Suhu Ruang":               (180, 365, "6–12 bulan · suhu ruang (kemasan tertutup, kering)"),
+        "Wadah Kering / Kedap Udara": (180, 365, "6–12 bulan · wadah kedap udara"),
+    },
+    "Powder Greentea / Matcha": {
+        "Suhu Ruang":               (90, 180, "3–6 bulan · suhu ruang (kemasan tertutup)"),
+        "Kulkas (1–4 °C)":          (180, 365, "6–12 bulan · kulkas (wadah kedap udara)"),
+        "Wadah Kering / Kedap Udara": (90, 180, "3–6 bulan · wadah kedap udara"),
+    },
+    "Powder Red Velvet": {
+        "Suhu Ruang":               (180, 365, "6–12 bulan · suhu ruang (kemasan tertutup)"),
+        "Wadah Kering / Kedap Udara": (180, 365, "6–12 bulan · wadah kedap udara"),
+    },
+    "Powder Chocolate / Coklat Bubuk": {
+        "Suhu Ruang":               (180, 365, "6–12 bulan · suhu ruang (kering)"),
+        "Wadah Kering / Kedap Udara": (365, 730, "1–2 tahun · wadah kedap udara"),
+    },
+    "Gula Aren / Aren Liquid": {
+        "Suhu Ruang":               (30, 60,  "1–2 bulan · suhu ruang (cair, botol tertutup)"),
+        "Kulkas (1–4 °C)":          (90, 180, "3–6 bulan · kulkas"),
+        "Pendingin / Chiller (4–10 °C)": (60, 120, "2–4 bulan · chiller"),
+    },
+    "Simple Syrup (Gula Cair)": {
+        "Suhu Ruang":               (14, 30,  "2–4 minggu · suhu ruang (botol steril, tertutup rapat)"),
+        "Kulkas (1–4 °C)":          (30, 60,  "1–2 bulan · kulkas"),
+        "Pendingin / Chiller (4–10 °C)": (21, 45, "3–6 minggu · chiller"),
+    },
+    "Syrup Hazelnut": {
+        "Suhu Ruang":               (180, 365, "6–12 bulan · suhu ruang (belum dibuka)"),
+        "Kulkas (1–4 °C)":          (30, 90,  "1–3 bulan · kulkas (setelah dibuka)"),
+    },
+    "Syrup Leci": {
+        "Suhu Ruang":               (180, 365, "6–12 bulan · suhu ruang (belum dibuka)"),
+        "Kulkas (1–4 °C)":          (30, 90,  "1–3 bulan · kulkas (setelah dibuka)"),
+    },
+    "Syrup Melon": {
+        "Suhu Ruang":               (180, 365, "6–12 bulan · suhu ruang (belum dibuka)"),
+        "Kulkas (1–4 °C)":          (30, 90,  "1–3 bulan · kulkas (setelah dibuka)"),
+    },
+    "Syrup Strawberry": {
+        "Suhu Ruang":               (180, 365, "6–12 bulan · suhu ruang (belum dibuka)"),
+        "Kulkas (1–4 °C)":          (30, 90,  "1–3 bulan · kulkas (setelah dibuka)"),
+    },
+    "Lemon Segar": {
+        "Suhu Ruang":               (7,  14,  "1–2 minggu · suhu ruang"),
+        "Kulkas (1–4 °C)":          (21, 42,  "3–6 minggu · kulkas"),
+        "Pendingin / Chiller (4–10 °C)": (14, 30, "2–4 minggu · chiller"),
+    },
+    "Teh Celup / Teh Bubuk": {
+        "Suhu Ruang":               (365, 730, "1–2 tahun · suhu ruang (teh kering, kemasan tertutup)"),
+        "Wadah Kering / Kedap Udara": (365, 730, "1–2 tahun · wadah kedap udara"),
+    },
+    "Yakult": {
+        "Kulkas (1–4 °C)":          (14, 30,  "2–4 minggu · kulkas (cek tanggal di botol)"),
+        "Pendingin / Chiller (4–10 °C)": (10, 21, "10–21 hari · chiller"),
+    },
+    "Air Mineral / Air Galon": {
+        "Suhu Ruang":               (14, 30,  "2–4 minggu · suhu ruang (galon terpasang di dispenser, jauh dari sinar matahari)"),
+        "Wadah Kering / Kedap Udara": (30, 60, "1–2 bulan · galon tersegel belum dibuka"),
+    },
+    "Es Batu Kristal / Batangan": {
+        "Freezer (≤ −18 °C)":       (30, 90,  "1–3 bulan · freezer (tersegel, jauh dari bahan berbau)"),
     },
 }
 
@@ -733,10 +949,14 @@ def page_administrasi(df: pd.DataFrame):
             st.text_input("Nama Supplier *",
                           placeholder="Contoh: Roastery A, Makmur Plastik", key="s1_sup")
 
-        # Foto invoice — kamera real-time, di luar form agar tidak reload form
-        with st.expander("📷 Ambil Foto Invoice (opsional)", expanded=False):
-            st.caption("Foto diambil langsung via kamera. Nama file otomatis: `{nota}_{cabang}_{waktu}.jpg`")
-            _foto_bytes, _nama_foto = render_foto_invoice()
+        # Foto invoice — WAJIB, kamera real-time langsung (bukan upload file)
+        st.markdown('<p class="form-section-title">📷 Foto Invoice — Wajib *</p>',
+                    unsafe_allow_html=True)
+        st.caption("Arahkan kamera ke nota/invoice lalu tekan tombol capture. "
+                   "Nama file otomatis: `{nota}_{cabang}_{waktu}.jpg`")
+        _foto_bytes, _nama_foto = render_foto_invoice()
+        if _foto_bytes is None:
+            st.warning("📷 Foto invoice belum diambil. Ambil foto nota sebelum menyimpan transaksi.")
 
         st.divider()
 
@@ -906,6 +1126,7 @@ def page_administrasi(df: pd.DataFrame):
             if not nama_val:     errors.append("Nama Barang (isi kolom 'Ketik Nama Barang Baru')")
             if f_qty  <= 0:      errors.append("Kuantitas harus lebih dari 0")
             if f_harga <= 0:     errors.append("Harga Satuan harus lebih dari 0")
+            if _foto_bytes is None: errors.append("Foto Invoice belum diambil")
 
             if errors:
                 st.error("Harap lengkapi: " + " · ".join(errors))
