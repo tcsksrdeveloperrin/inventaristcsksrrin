@@ -267,6 +267,109 @@ UOM_OPTIONS    = ["kg", "gram", "liter", "ml", "pcs", "pack", "dus", "botol", "k
 GRIND_OPTIONS  = ["-", "Whole Bean", "V60 (5-6)", "Vietnam Drip (3-4)", "Espresso (2-3)", "French Press (7-8)"]
 STATUS_OPTIONS = ["Lunas", "Tempo (Hutang)", "DP/Uang Muka"]
 
+# ─── SHELF LIFE MAP ──────────────────────────────────────────────────────────────
+# Produk yang TIDAK memiliki expired date di kemasan → estimasi otomatis per metode simpan.
+# Format: { nama_barang: { metode_simpan: (hari_min, hari_max, label) } }
+METODE_SIMPAN_OPTIONS = ["Pilih metode penyimpanan...", "Suhu Ruang", "Kulkas / Pendingin", "Freezer", "Wadah Kering / Kedap Udara"]
+
+SHELF_LIFE_MAP = {
+    # ── BAHAN BAKU MAKANAN ──
+    "Telur Ayam": {
+        "Suhu Ruang":                (7,  21,  "1–3 minggu (suhu ruang)"),
+        "Kulkas / Pendingin":        (21, 35,  "3–5 minggu (kulkas)"),
+        "Freezer":                   (90, 365, "3–12 bulan (freezer, sudah dikocok)"),
+    },
+    "Ayam Fillet / Ayam Potong": {
+        "Suhu Ruang":                (0,  1,   "Maks 2 jam (suhu ruang — segera masak)"),
+        "Kulkas / Pendingin":        (1,  2,   "1–2 hari (kulkas)"),
+        "Freezer":                   (90, 270, "3–9 bulan (freezer)"),
+    },
+    "Daging Kambing": {
+        "Kulkas / Pendingin":        (3,  5,   "3–5 hari (kulkas)"),
+        "Freezer":                   (90, 180, "3–6 bulan (freezer)"),
+    },
+    "Ikan Jambal Roti": {
+        "Suhu Ruang":                (14, 30,  "2–4 minggu (suhu ruang, sudah dikeringkan)"),
+        "Kulkas / Pendingin":        (30, 60,  "1–2 bulan (kulkas)"),
+        "Freezer":                   (90, 180, "3–6 bulan (freezer)"),
+    },
+    "Tahu Putih / Tahu Goreng": {
+        "Suhu Ruang":                (1,  1,   "Maks 1 hari (suhu ruang)"),
+        "Kulkas / Pendingin":        (3,  5,   "3–5 hari (kulkas, rendam air ganti tiap hari)"),
+    },
+    "Tempe": {
+        "Suhu Ruang":                (1,  2,   "1–2 hari (suhu ruang)"),
+        "Kulkas / Pendingin":        (5,  7,   "5–7 hari (kulkas)"),
+        "Freezer":                   (90, 180, "3–6 bulan (freezer)"),
+    },
+    "Oncom": {
+        "Suhu Ruang":                (1,  2,   "1–2 hari (suhu ruang)"),
+        "Kulkas / Pendingin":        (3,  5,   "3–5 hari (kulkas)"),
+    },
+    "Bakso": {
+        "Kulkas / Pendingin":        (3,  5,   "3–5 hari (kulkas)"),
+        "Freezer":                   (30, 90,  "1–3 bulan (freezer)"),
+    },
+    "Seafood Mix (Cumi, Udang, dll)": {
+        "Kulkas / Pendingin":        (1,  2,   "1–2 hari (kulkas)"),
+        "Freezer":                   (90, 180, "3–6 bulan (freezer)"),
+    },
+    "Pisang Kepok / Cavendish": {
+        "Suhu Ruang":                (3,  7,   "3–7 hari (suhu ruang, tergantung kematangan)"),
+        "Kulkas / Pendingin":        (7,  14,  "1–2 minggu (kulkas, kulit menghitam normal)"),
+    },
+    "Kol / Kubis": {
+        "Suhu Ruang":                (3,  5,   "3–5 hari (suhu ruang)"),
+        "Kulkas / Pendingin":        (14, 21,  "2–3 minggu (kulkas)"),
+    },
+    "Sayuran Capcay (Wortel, Sawi, Jagung muda, dll)": {
+        "Suhu Ruang":                (1,  2,   "1–2 hari (suhu ruang)"),
+        "Kulkas / Pendingin":        (5,  7,   "5–7 hari (kulkas)"),
+    },
+    "Lemon Segar": {
+        "Suhu Ruang":                (7,  14,  "1–2 minggu (suhu ruang)"),
+        "Kulkas / Pendingin":        (21, 42,  "3–6 minggu (kulkas)"),
+    },
+    # ── BAHAN BAKU MINUMAN ──
+    "Beans Natural": {
+        "Suhu Ruang":                (14, 30,  "2–4 minggu setelah roasting (suhu ruang, kedap udara)"),
+        "Wadah Kering / Kedap Udara":(30, 60,  "1–2 bulan (wadah kedap udara)"),
+    },
+    "Adonan Surabi (Tepung Beras + Santan)": {
+        "Kulkas / Pendingin":        (1,  2,   "1–2 hari (kulkas)"),
+        "Freezer":                   (7,  14,  "1–2 minggu (freezer)"),
+    },
+    "Sambal": {
+        "Suhu Ruang":                (1,  1,   "Maks 1 hari (suhu ruang)"),
+        "Kulkas / Pendingin":        (5,  7,   "5–7 hari (kulkas)"),
+        "Freezer":                   (30, 60,  "1–2 bulan (freezer)"),
+    },
+    "Cuko Pempek": {
+        "Suhu Ruang":                (1,  2,   "1–2 hari (suhu ruang)"),
+        "Kulkas / Pendingin":        (7,  14,  "1–2 minggu (kulkas)"),
+    },
+    "Serundeng Kelapa": {
+        "Suhu Ruang":                (7,  14,  "1–2 minggu (suhu ruang, wadah tertutup)"),
+        "Wadah Kering / Kedap Udara":(14, 30,  "2–4 minggu (wadah kedap udara)"),
+    },
+    "Risoles": {
+        "Kulkas / Pendingin":        (2,  3,   "2–3 hari (kulkas, belum digoreng)"),
+        "Freezer":                   (30, 60,  "1–2 bulan (freezer, belum digoreng)"),
+    },
+    "Simple Syrup (Gula Cair)": {
+        "Suhu Ruang":                (14, 30,  "2–4 minggu (suhu ruang, botol steril tertutup)"),
+        "Kulkas / Pendingin":        (30, 60,  "1–2 bulan (kulkas)"),
+    },
+    "Pempek Original": {
+        "Kulkas / Pendingin":        (3,  5,   "3–5 hari (kulkas)"),
+        "Freezer":                   (30, 90,  "1–3 bulan (freezer)"),
+    },
+    "Pempek Kapal Selam": {
+        "Kulkas / Pendingin":        (3,  5,   "3–5 hari (kulkas)"),
+        "Freezer":                   (30, 90,  "1–3 bulan (freezer)"),
+    },
+}
+
 KOLOM_DB = [
     "id", "cabang", "tanggal", "no_nota", "supplier",
     "kategori", "sub_kategori", "nama_barang", "merk", "grind_size",
@@ -314,7 +417,9 @@ def get_data(cabang: str) -> pd.DataFrame:
 def insert_row(data: dict) -> bool:
     if supabase:
         try:
-            supabase.table("transaksi").insert(data).execute()
+            # Hapus kolom generated (total_harga dihitung otomatis oleh Supabase)
+            payload = {k: v for k, v in data.items() if k != "total_harga"}
+            supabase.table("transaksi").insert(payload).execute()
             return True
         except Exception as e:
             st.error(f"Gagal menyimpan ke database: {e}")
@@ -328,7 +433,9 @@ def insert_row(data: dict) -> bool:
 def update_row(row_id, data: dict) -> bool:
     if supabase:
         try:
-            supabase.table("transaksi").update(data).eq("id", row_id).execute()
+            # Hapus kolom generated (total_harga dihitung otomatis oleh Supabase)
+            payload = {k: v for k, v in data.items() if k != "total_harga"}
+            supabase.table("transaksi").update(payload).eq("id", row_id).execute()
             return True
         except Exception as e:
             st.error(f"Gagal memperbarui: {e}")
@@ -479,6 +586,64 @@ def _get_s2_grind() -> str:
         return st.session_state.get("s2_grind", "-")
     return "-"
 
+# ─── HELPER: FOTO INVOICE ────────────────────────────────────────────────────────
+def render_foto_invoice():
+    """
+    Tampilkan kamera real-time untuk foto invoice.
+    Nama file otomatis: {no_nota}_{cabang}_{tanggal_foto}.jpg
+    Simpan ke Supabase Storage bucket 'invoice-foto' jika tersedia,
+    atau kembalikan bytes untuk disimpan lokal / ditampilkan.
+    Mengembalikan (bytes_foto | None, nama_file | None).
+    """
+    import io
+    foto_bytes = st.camera_input(
+        "📷 Foto Invoice (kamera langsung)",
+        help="Arahkan kamera ke invoice/nota, lalu tekan tombol untuk mengambil foto",
+        key="s1_kamera",
+    )
+    if foto_bytes is not None:
+        nota    = st.session_state.get("s1_nota", "NONOTA").strip() or "NONOTA"
+        cabang  = st.session_state.get("cabang",  "CBG").strip()
+        tgl_str = datetime.now().strftime("%Y%m%d_%H%M%S")
+        # Bersihkan karakter yang tidak aman untuk nama file
+        nota_clean   = "".join(c for c in nota   if c.isalnum() or c in "-_")
+        cabang_clean = "".join(c for c in cabang if c.isalnum() or c in "-_")
+        nama_file = f"{nota_clean}_{cabang_clean}_{tgl_str}.jpg"
+
+        # Upload ke Supabase Storage jika tersedia
+        if supabase:
+            try:
+                supabase.storage.from_("invoice-foto").upload(
+                    path=nama_file,
+                    file=foto_bytes.getvalue(),
+                    file_options={"content-type": "image/jpeg"},
+                )
+                st.success(f"Foto tersimpan: **{nama_file}**")
+            except Exception as e:
+                st.warning(f"Upload ke Storage gagal ({e}). Foto tetap ditampilkan di sini.")
+        else:
+            st.info(f"Nama file foto: **{nama_file}** (Supabase Storage belum terhubung)")
+
+        return foto_bytes.getvalue(), nama_file
+    return None, None
+
+# ─── HELPER: HITUNG KADALUARSA OTOMATIS ─────────────────────────────────────────
+def hitung_kadaluarsa_otomatis(nama_barang: str, metode: str, tgl_beli: date):
+    """
+    Hitung estimasi tanggal kadaluarsa otomatis berdasarkan SHELF_LIFE_MAP.
+    Mengembalikan (tgl_min: date, tgl_max: date, label: str) atau (None, None, "").
+    """
+    from datetime import timedelta
+    produk_map = SHELF_LIFE_MAP.get(nama_barang)
+    if not produk_map or metode not in produk_map:
+        return None, None, ""
+    hari_min, hari_max, label = produk_map[metode]
+    return (
+        tgl_beli + timedelta(days=hari_min),
+        tgl_beli + timedelta(days=hari_max),
+        label,
+    )
+
 # ─── PAGE: DASHBOARD ─────────────────────────────────────────────────────────────
 def page_dashboard(df: pd.DataFrame):
     st.title("📊 Dashboard")
@@ -567,6 +732,11 @@ def page_administrasi(df: pd.DataFrame):
         with c1c:
             st.text_input("Nama Supplier *",
                           placeholder="Contoh: Roastery A, Makmur Plastik", key="s1_sup")
+
+        # Foto invoice — kamera real-time, di luar form agar tidak reload form
+        with st.expander("📷 Ambil Foto Invoice (opsional)", expanded=False):
+            st.caption("Foto diambil langsung via kamera. Nama file otomatis: `{nota}_{cabang}_{waktu}.jpg`")
+            _foto_bytes, _nama_foto = render_foto_invoice()
 
         st.divider()
 
@@ -659,10 +829,54 @@ def page_administrasi(df: pd.DataFrame):
             st.markdown('<p class="form-section-title">🔍 Seksi 4 — Kontrol & Audit</p>',
                         unsafe_allow_html=True)
 
+            # Cek apakah barang yang dipilih ada di SHELF_LIFE_MAP (tidak ada expired di kemasan)
+            nama_untuk_shelf = st.session_state.get("s2_nama_sel", "")
+            if nama_untuk_shelf == "Lainnya":
+                nama_untuk_shelf = st.session_state.get("s2_nama_custom", "").strip()
+            ada_di_shelf_map = nama_untuk_shelf in SHELF_LIFE_MAP
+
             ci, cj = st.columns(2)
             with ci:
-                f_exp    = st.date_input("Tanggal Kadaluarsa", value=None,
-                                         help="Kosongkan jika tidak relevan (Packaging, dll)")
+                if ada_di_shelf_map:
+                    # Produk tanpa expired date di kemasan → pilih metode simpan
+                    metode_opts = METODE_SIMPAN_OPTIONS.copy()
+                    metode_tersedia = list(SHELF_LIFE_MAP[nama_untuk_shelf].keys())
+                    # Filter hanya metode yang relevan untuk produk ini
+                    metode_opts = ["Pilih metode penyimpanan..."] + metode_tersedia
+                    f_metode = st.selectbox(
+                        f"🌡️ Metode Penyimpanan *",
+                        metode_opts,
+                        key="s4_metode",
+                        help=f"Pilih cara penyimpanan untuk estimasi kadaluarsa otomatis"
+                    )
+                    # Hitung estimasi kadaluarsa
+                    tgl_beli = st.session_state.get("s1_tgl", date.today())
+                    if f_metode != "Pilih metode penyimpanan...":
+                        tgl_min, tgl_max, shelf_label = hitung_kadaluarsa_otomatis(
+                            nama_untuk_shelf, f_metode, tgl_beli
+                        )
+                        if tgl_min:
+                            st.success(
+                                f"📅 **Estimasi Kadaluarsa:** {tgl_min.strftime('%d %b %Y')} "
+                                f"s/d {tgl_max.strftime('%d %b %Y')}\n\n"
+                                f"_{shelf_label}_"
+                            )
+                            # Gunakan titik tengah sebagai tanggal kadaluarsa yang disimpan
+                            from datetime import timedelta
+                            f_exp = tgl_min + (tgl_max - tgl_min) // 2
+                        else:
+                            f_exp = None
+                    else:
+                        f_exp = None
+                        st.caption("⬆️ Pilih metode penyimpanan untuk estimasi kadaluarsa otomatis.")
+                else:
+                    # Produk dengan kemasan ber-expired date → pilih manual
+                    f_exp = st.date_input(
+                        "Tanggal Kadaluarsa",
+                        value=None,
+                        help="Isi sesuai tanggal expired yang tertera di kemasan. Kosongkan jika tidak relevan (Packaging, dll)."
+                    )
+
             with cj:
                 f_status = st.selectbox("Status Pembayaran *", STATUS_OPTIONS)
 
