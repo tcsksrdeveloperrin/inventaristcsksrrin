@@ -781,8 +781,6 @@ def show_sidebar():
         pages = [
             "📊 Dashboard",
             "📋 Administrasi",
-            "🏷️ Identitas Barang",
-            "📦 Detail Stok",
             "🔍 Kontrol & Audit",
         ]
         page = st.radio("Menu", pages, label_visibility="collapsed")
@@ -884,63 +882,260 @@ def hitung_kadaluarsa_otomatis(nama_barang: str, metode: str, tgl_beli: date):
 
 # ─── PAGE: DASHBOARD ─────────────────────────────────────────────────────────────
 def page_dashboard(df: pd.DataFrame):
+    import numpy as np
+
+    now_str = datetime.now().strftime("%A, %d %B %Y · %H:%M")
     st.title("📊 Dashboard")
-    st.caption(f"Cabang **{st.session_state.cabang}** · {datetime.now().strftime('%A, %d %B %Y')}")
+    st.caption(f"Cabang **{st.session_state.cabang}** · {now_str}")
 
     if df.empty:
         empty_state("📊", "Belum Ada Data",
                     "Mulai catat transaksi pertama di halaman Administrasi.")
         return
 
-    df["total_harga"]  = pd.to_numeric(df["total_harga"],  errors="coerce").fillna(0)
-    df["harga_satuan"] = pd.to_numeric(df["harga_satuan"], errors="coerce").fillna(0)
-    df["qty"]          = pd.to_numeric(df["qty"],          errors="coerce").fillna(0)
+    # ── Normalisasi kolom numerik ─────────────────────────────────────────────
+    col_harga = "harga_total" if "harga_total" in df.columns else "total_harga"
+    df[col_harga] = pd.to_numeric(df[col_harga], errors="coerce").fillna(0)
+    df["qty"]     = pd.to_numeric(df.get("qty", 0), errors="coerce").fillna(0)
+    if "tanggal" in df.columns:
+        df["tanggal_dt"] = pd.to_datetime(df["tanggal"], errors="coerce")
+        df["bulan"]      = df["tanggal_dt"].dt.to_period("M").astype(str)
+        df["minggu"]     = df["tanggal_dt"].dt.to_period("W").astype(str)
 
-    total_keluar = df["total_harga"].sum()
-    total_trx    = len(df)
-    n_lunas      = len(df[df["status_pembayaran"] == "Lunas"])
-    total_hutang = df[df["status_pembayaran"].str.contains("Tempo|DP", na=False)]["total_harga"].sum()
+    today        = pd.Timestamp.today().normalize()
+    bulan_ini    = today.to_period("M").strftime("%Y-%m")
+    bulan_lalu   = (today - pd.DateOffset(months=1)).to_period("M").strftime("%Y-%m")
 
-    c1, c2, c3, c4 = st.columns(4)
-    c1.metric("💸 Total Pengeluaran",    f"Rp {total_keluar:,.0f}")
-    c2.metric("📝 Jumlah Transaksi",      total_trx)
-    c3.metric("✅ Lunas",               f"{n_lunas} dari {total_trx}")
-    c4.metric("⏳ Total Hutang Supplier", f"Rp {total_hutang:,.0f}")
+    total_keluar    = df[col_harga].sum()
+    total_bln_ini   = df[df["bulan"] == bulan_ini][col_harga].sum() if "bulan" in df else 0
+    total_bln_lalu  = df[df["bulan"] == bulan_lalu][col_harga].sum() if "bulan" in df else 0
+    delta_bln       = total_bln_ini - total_bln_lalu
+    total_trx       = len(df)
+    n_lunas         = len(df[df["status_pembayaran"] == "Lunas"]) if "status_pembayaran" in df.columns else 0
+    total_hutang    = df[df["status_pembayaran"].str.contains("Tempo|DP", na=False)][col_harga].sum() if "status_pembayaran" in df.columns else 0
+    jenis_barang    = df["nama_barang"].nunique() if "nama_barang" in df.columns else 0
 
-    st.markdown("---")
-    col_a, col_b = st.columns(2)
-    with col_a:
-        st.subheader("📂 Pengeluaran per Kategori")
-        kat = df.groupby("kategori")["total_harga"].sum().reset_index()
-        kat.columns = ["Kategori", "Total (Rp)"]
-        st.dataframe(kat.sort_values("Total (Rp)", ascending=False),
-                     use_container_width=True, hide_index=True)
-    with col_b:
-        st.subheader("🏪 Top Supplier")
-        sup = df.groupby("supplier")["total_harga"].sum().reset_index()
-        sup.columns = ["Supplier", "Total (Rp)"]
-        st.dataframe(sup.sort_values("Total (Rp)", ascending=False).head(8),
-                     use_container_width=True, hide_index=True)
-
-    st.markdown("---")
-    st.subheader("⚠️ Peringatan Kadaluarsa 30 Hari ke Depan")
+    # ── Kadaluarsa alert ─────────────────────────────────────────────────────
+    n_kritis = n_mendekat = 0
     if "tgl_kadaluarsa" in df.columns:
-        df_exp = df[
-            df["tgl_kadaluarsa"].notna() &
-            (df["tgl_kadaluarsa"].astype(str).str.strip().isin(["", "None"]) == False)
-        ].copy()
+        df_exp = df[df["tgl_kadaluarsa"].notna() &
+                    (df["tgl_kadaluarsa"].astype(str).str.strip() != "") &
+                    (df["tgl_kadaluarsa"].astype(str).str.strip() != "None")].copy()
         if not df_exp.empty:
             df_exp["tgl_kadaluarsa"] = pd.to_datetime(df_exp["tgl_kadaluarsa"], errors="coerce")
-            today = pd.Timestamp.today().normalize()
-            soon  = df_exp[df_exp["tgl_kadaluarsa"] <= today + pd.Timedelta(days=30)]
-            if not soon.empty:
-                cols = [c for c in ["nama_barang","merk","qty","uom","tgl_kadaluarsa"] if c in soon.columns]
-                st.dataframe(soon[cols].sort_values("tgl_kadaluarsa"),
-                             use_container_width=True, hide_index=True)
+            n_kritis   = len(df_exp[df_exp["tgl_kadaluarsa"] <= today + pd.Timedelta(days=7)])
+            n_mendekat = len(df_exp[
+                (df_exp["tgl_kadaluarsa"] > today + pd.Timedelta(days=7)) &
+                (df_exp["tgl_kadaluarsa"] <= today + pd.Timedelta(days=30))
+            ])
+
+    # ═══════════════════════════════════════════════════════════════════════════
+    # BARIS 1: FLASHCARD UTAMA
+    # ═══════════════════════════════════════════════════════════════════════════
+    st.markdown("### 💡 Ringkasan Hari Ini")
+    fc1, fc2, fc3, fc4, fc5, fc6 = st.columns(6)
+    fc1.metric("💸 Total Pengeluaran", f"Rp {total_keluar:,.0f}")
+    fc2.metric("📅 Bulan Ini",
+               f"Rp {total_bln_ini:,.0f}",
+               delta=f"Rp {delta_bln:+,.0f} vs bulan lalu",
+               delta_color="inverse")
+    fc3.metric("📝 Total Transaksi", total_trx)
+    fc4.metric("⏳ Hutang Supplier",  f"Rp {total_hutang:,.0f}",
+               delta_color="inverse")
+    fc5.metric("🚨 Kadaluarsa Kritis", f"{n_kritis} item",
+               delta=f"{n_mendekat} mendekati" if n_mendekat else None,
+               delta_color="inverse")
+    fc6.metric("📦 Jenis Barang", jenis_barang)
+
+    if n_kritis > 0:
+        st.error(f"🚨 **{n_kritis} item** sudah kadaluarsa atau ≤7 hari! Cek halaman Kontrol & Audit.")
+    elif n_mendekat > 0:
+        st.warning(f"⚠️ **{n_mendekat} item** akan kadaluarsa dalam 30 hari.")
+
+    st.divider()
+
+    # ═══════════════════════════════════════════════════════════════════════════
+    # BARIS 2: PENGELUARAN BULANAN + KOMPOSISI KATEGORI
+    # ═══════════════════════════════════════════════════════════════════════════
+    st.markdown("### 📈 Analisis Pengeluaran")
+    col_grafik1, col_grafik2 = st.columns([3, 2])
+
+    with col_grafik1:
+        st.markdown("**📊 Pengeluaran Bulanan (Time Series)**")
+        if "bulan" in df.columns:
+            monthly = (df.groupby("bulan")[col_harga].sum()
+                       .reset_index()
+                       .rename(columns={col_harga: "Total (Rp)", "bulan": "Bulan"})
+                       .sort_values("Bulan"))
+            if len(monthly) >= 2:
+                # Regresi linear sederhana untuk trend line
+                x = np.arange(len(monthly))
+                y = monthly["Total (Rp)"].values
+                m, b = np.polyfit(x, y, 1)
+                monthly["Trend (Rp)"] = m * x + b
+                st.line_chart(monthly.set_index("Bulan")[["Total (Rp)", "Trend (Rp)"]],
+                              use_container_width=True)
+                arah = "📈 naik" if m > 0 else "📉 turun"
+                st.caption(f"Tren: pengeluaran rata-rata {arah} **Rp {abs(m):,.0f}** per bulan "
+                           f"(regresi linear · {len(monthly)} bulan data)")
+            elif len(monthly) == 1:
+                st.bar_chart(monthly.set_index("Bulan")["Total (Rp)"], use_container_width=True)
             else:
-                st.success("Tidak ada barang yang akan kadaluarsa dalam 30 hari ke depan.")
-        else:
-            st.info("Belum ada data kadaluarsa yang dicatat.")
+                st.info("Belum cukup data untuk grafik.")
+
+    with col_grafik2:
+        st.markdown("**🗂️ Komposisi per Kategori**")
+        if "kategori" in df.columns:
+            kat_grp = (df.groupby("kategori")[col_harga].sum()
+                       .reset_index()
+                       .rename(columns={col_harga: "Total (Rp)"})
+                       .sort_values("Total (Rp)", ascending=False))
+            total_all = kat_grp["Total (Rp)"].sum()
+            for _, r in kat_grp.iterrows():
+                pct = r["Total (Rp)"] / total_all * 100 if total_all > 0 else 0
+                st.markdown(f"**{r['kategori']}**")
+                st.progress(int(pct), text=f"Rp {r['Total (Rp)']:,.0f} · {pct:.1f}%")
+
+    st.divider()
+
+    # ═══════════════════════════════════════════════════════════════════════════
+    # BARIS 3: ANALISIS HARGA (VOLATILITAS & MOVING AVERAGE)
+    # ═══════════════════════════════════════════════════════════════════════════
+    st.markdown("### 🔬 Analisis Harga per Produk")
+    col_trend, col_stat = st.columns([3, 2])
+
+    with col_trend:
+        st.markdown("**📉 Tren Harga Produk + Moving Average**")
+        if "nama_barang" in df.columns and "tanggal_dt" in df.columns:
+            barang_opts = sorted(df["nama_barang"].dropna().unique())
+            pilih_barang = st.selectbox("Pilih produk", barang_opts, key="db_tren_barang")
+            tren_df = df[df["nama_barang"] == pilih_barang][["tanggal_dt", col_harga, "qty"]].copy()
+            tren_df = tren_df.dropna(subset=["tanggal_dt"]).sort_values("tanggal_dt")
+            # Harga per unit estimasi
+            tren_df["qty_safe"] = tren_df["qty"].replace(0, np.nan)
+            tren_df["harga_per_unit"] = tren_df[col_harga] / tren_df["qty_safe"]
+            tren_df = tren_df.dropna(subset=["harga_per_unit"])
+            tren_df = tren_df.set_index("tanggal_dt")
+
+            if len(tren_df) >= 3:
+                tren_df["MA3"] = tren_df["harga_per_unit"].rolling(3, min_periods=1).mean()
+                st.line_chart(tren_df[["harga_per_unit", "MA3"]], use_container_width=True)
+
+                # Statistik deskriptif
+                mu  = tren_df["harga_per_unit"].mean()
+                std = tren_df["harga_per_unit"].std()
+                cv  = std / mu * 100 if mu > 0 else 0
+                st.caption(
+                    f"Rata-rata: **Rp {mu:,.0f}** · "
+                    f"Std dev: **Rp {std:,.0f}** · "
+                    f"Koefisien variasi: **{cv:.1f}%**"
+                    + (" — harga cukup stabil ✅" if cv < 10 else " — harga fluktuatif ⚠️")
+                )
+            elif len(tren_df) >= 1:
+                st.bar_chart(tren_df[["harga_per_unit"]], use_container_width=True)
+                st.caption("Butuh ≥3 transaksi untuk moving average.")
+            else:
+                st.info("Belum ada data harga untuk produk ini.")
+
+    with col_stat:
+        st.markdown("**📊 Top 5 Pengeluaran per Produk**")
+        if "nama_barang" in df.columns:
+            top5 = (df.groupby("nama_barang")[col_harga].sum()
+                    .sort_values(ascending=False).head(5)
+                    .reset_index()
+                    .rename(columns={"nama_barang": "Produk", col_harga: "Total (Rp)"}))
+            for i, r in top5.iterrows():
+                pct = r["Total (Rp)"] / total_keluar * 100 if total_keluar > 0 else 0
+                medal = ["🥇","🥈","🥉","4️⃣","5️⃣"][i]
+                st.markdown(f"{medal} **{r['Produk']}**  \n"
+                            f"Rp {r['Total (Rp)']:,.0f} · {pct:.1f}%")
+
+    st.divider()
+
+    # ═══════════════════════════════════════════════════════════════════════════
+    # BARIS 4: SUPPLIER + FREKUENSI PEMBELIAN
+    # ═══════════════════════════════════════════════════════════════════════════
+    st.markdown("### 🏪 Analisis Supplier & Frekuensi")
+    col_sup, col_freq = st.columns(2)
+
+    with col_sup:
+        st.markdown("**🏆 Top Supplier (by nilai pembelian)**")
+        if "supplier" in df.columns:
+            sup_df = (df.groupby("supplier")
+                      .agg(total=(col_harga, "sum"), frekuensi=("tanggal", "count"))
+                      .reset_index()
+                      .sort_values("total", ascending=False)
+                      .head(8))
+            sup_df.columns = ["Supplier", "Total (Rp)", "Frekuensi"]
+            sup_df["Total (Rp)"] = sup_df["Total (Rp)"].apply(lambda x: f"Rp {x:,.0f}")
+            st.dataframe(sup_df, use_container_width=True, hide_index=True)
+
+    with col_freq:
+        st.markdown("**📆 Frekuensi Pembelian per Minggu**")
+        if "minggu" in df.columns:
+            weekly = (df.groupby("minggu").size()
+                      .reset_index(name="Jumlah Item")
+                      .sort_values("minggu")
+                      .tail(12))  # 12 minggu terakhir
+            if len(weekly) >= 2:
+                st.bar_chart(weekly.set_index("minggu")["Jumlah Item"],
+                             use_container_width=True)
+                avg_w = weekly["Jumlah Item"].mean()
+                st.caption(f"Rata-rata **{avg_w:.1f} item** dibeli per minggu "
+                           f"(12 minggu terakhir)")
+            else:
+                st.info("Butuh minimal 2 minggu data.")
+
+    st.divider()
+
+    # ═══════════════════════════════════════════════════════════════════════════
+    # BARIS 5: STATUS PEMBAYARAN + KADALUARSA SEGERA
+    # ═══════════════════════════════════════════════════════════════════════════
+    st.markdown("### ⚠️ Perlu Perhatian")
+    col_bayar, col_exp = st.columns(2)
+
+    with col_bayar:
+        st.markdown("**💳 Status Pembayaran**")
+        if "status_pembayaran" in df.columns:
+            st_df = (df.groupby("status_pembayaran")[col_harga].sum()
+                     .reset_index()
+                     .rename(columns={"status_pembayaran": "Status", col_harga: "Total (Rp)"}))
+            for _, r in st_df.iterrows():
+                icon = "✅" if r["Status"] == "Lunas" else "⏳"
+                st.markdown(f"{icon} **{r['Status']}:** Rp {r['Total (Rp)']:,.0f}")
+
+            hutang_items = df[df["status_pembayaran"] != "Lunas"]
+            if not hutang_items.empty:
+                st.markdown("---")
+                st.caption("Supplier dengan tagihan belum lunas:")
+                ht = (hutang_items.groupby("supplier")[col_harga].sum()
+                      .sort_values(ascending=False).head(5))
+                for sup, val in ht.items():
+                    st.markdown(f"• **{sup}**: Rp {val:,.0f}")
+
+    with col_exp:
+        st.markdown("**🗓️ Kadaluarsa Terdekat**")
+        if "tgl_kadaluarsa" in df.columns and not df_exp.empty if "df_exp" in dir() else False:
+            pass
+        # re-compute untuk tampilan ini
+        if "tgl_kadaluarsa" in df.columns:
+            _exp = df[df["tgl_kadaluarsa"].notna() &
+                      (df["tgl_kadaluarsa"].astype(str).str.strip() != "") &
+                      (df["tgl_kadaluarsa"].astype(str).str.strip() != "None")].copy()
+            if not _exp.empty:
+                _exp["tgl_kadaluarsa"] = pd.to_datetime(_exp["tgl_kadaluarsa"], errors="coerce")
+                _soon = _exp[_exp["tgl_kadaluarsa"] <= today + pd.Timedelta(days=30)].sort_values("tgl_kadaluarsa")
+                if not _soon.empty:
+                    for _, r in _soon.head(6).iterrows():
+                        sisa = (r["tgl_kadaluarsa"] - today).days
+                        icon = "🔴" if sisa <= 7 else "🟡"
+                        nama = r.get("nama_barang", "-")
+                        st.markdown(f"{icon} **{nama}** — sisa **{sisa} hari** "
+                                    f"({r['tgl_kadaluarsa'].strftime('%d %b %Y')})")
+                else:
+                    st.success("✅ Tidak ada barang yang kadaluarsa dalam 30 hari ke depan.")
+            else:
+                st.info("Belum ada data kadaluarsa dicatat.")
 
 # ─── PAGE: ADMINISTRASI ───────────────────────────────────────────────────────────
 def page_administrasi(df: pd.DataFrame):
@@ -1206,6 +1401,12 @@ def page_administrasi(df: pd.DataFrame):
                 "➕ Tambahkan Item ke Nota Ini",
                 type="primary", use_container_width=True
             )
+            st.markdown("<br>", unsafe_allow_html=True)
+            submit_langsung = st.form_submit_button(
+                "💾 Submit Transaksi Baru (Item Tunggal — Langsung Simpan)",
+                use_container_width=True,
+                help="Gunakan tombol ini jika hanya membeli 1 jenis barang dan langsung ingin menyimpan tanpa keranjang."
+            )
 
         # ── PROSES SUBMIT ITEM ────────────────────────────────────────────────
         if submit_item:
@@ -1259,6 +1460,58 @@ def page_administrasi(df: pd.DataFrame):
                            f"Tambah item lain atau tekan 'Simpan Semua' di atas.")
                 st.rerun()
 
+        # ── PROSES SUBMIT LANGSUNG (item tunggal, bypass keranjang) ──────────
+        if submit_langsung:
+            sup_val      = st.session_state.get("s1_sup",      "").strip()
+            pencatat_val = st.session_state.get("s1_pencatat", "").strip()
+            nota_val     = st.session_state.get("s1_nota",     "").strip()
+            tgl_val      = st.session_state.get("s1_tgl",      date.today())
+            jam_val      = st.session_state.get("s1_jam",      datetime.now().time())
+            kat_val      = st.session_state.get("s2_kategori", KATEGORI_OPTIONS[0])
+            sub_val      = st.session_state.get("s2_sub",      "")
+            nama_val     = _get_s2_nama()
+            merk_val     = _get_s2_merk()
+            grind_val    = _get_s2_grind()
+
+            errors = []
+            if not sup_val:        errors.append("Nama Supplier")
+            if not pencatat_val:   errors.append("Nama Pencatat")
+            if not nama_val:       errors.append("Nama Barang")
+            if f_qty  <= 0:        errors.append("Kuantitas harus > 0")
+            if f_harga_total <= 0: errors.append("Harga Total harus > 0")
+            if _foto_bytes is None: errors.append("Foto Invoice belum diambil")
+
+            if errors:
+                st.error("Harap lengkapi: " + " · ".join(errors))
+            else:
+                jam_str = jam_val.strftime("%H:%M:%S") if hasattr(jam_val, "strftime") else str(jam_val)
+                ok = insert_row({
+                    "cabang":            st.session_state.cabang,
+                    "tanggal":           tgl_val.isoformat(),
+                    "jam_transaksi":     jam_str,
+                    "no_nota":           nota_val or None,
+                    "supplier":          sup_val,
+                    "nama_pencatat":     pencatat_val,
+                    "kategori":          kat_val,
+                    "sub_kategori":      sub_val,
+                    "nama_barang":       nama_val,
+                    "merk":              merk_val,
+                    "grind_size":        grind_val,
+                    "qty":               float(f_qty),
+                    "uom_qty":           f_uom_qty,
+                    "vol_per_unit":      float(f_vol) if f_vol > 0 else None,
+                    "uom_vol":           f_uom_vol if f_vol > 0 else None,
+                    "netto_total":       round(netto_total, 3) if netto_total > 0 else None,
+                    "harga_total":       int(f_harga_total),
+                    "tgl_kadaluarsa":    f_exp.isoformat() if f_exp else None,
+                    "status_pembayaran": f_status,
+                    "catatan":           f_catatan.strip() or None,
+                    "foto_invoice":      _nama_foto or None,
+                })
+                if ok:
+                    st.success(f"✅ Transaksi **{nama_val}** dari **{sup_val}** langsung disimpan!")
+                    st.balloons()
+
     # ═══════════════════════════════════════════════════════════════════════════
     # TAB 2: RIWAYAT TRANSAKSI
     # ═══════════════════════════════════════════════════════════════════════════
@@ -1267,17 +1520,23 @@ def page_administrasi(df: pd.DataFrame):
             empty_state("📃", "Belum Ada Riwayat",
                         "Catat transaksi pertama di tab 'Catat Transaksi Baru'.")
         else:
-            rf1, rf2, rf3, rf4 = st.columns(4)
+            # ── Filter bar ────────────────────────────────────────────────────
+            rf1, rf2, rf3, rf4, rf5 = st.columns(5)
             with rf1:
-                cari    = st.text_input("Cari nama barang / supplier", key="r_cari")
+                cari    = st.text_input("🔍 Cari barang / supplier", key="r_cari")
             with rf2:
                 fil_kat = st.selectbox("Kategori", ["Semua"] + KATEGORI_OPTIONS, key="r_kat")
             with rf3:
-                fil_st  = st.selectbox("Status", ["Semua"] + STATUS_OPTIONS, key="r_st")
+                fil_st  = st.selectbox("Status Bayar", ["Semua"] + STATUS_OPTIONS, key="r_st")
             with rf4:
                 fil_bln = st.text_input("Bulan (YYYY-MM)", placeholder="2025-07", key="r_bln")
+            with rf5:
+                fil_nota = st.text_input("No. Nota", placeholder="INV-001", key="r_nota")
 
             hasil = df.copy()
+            col_harga_r = "harga_total" if "harga_total" in hasil.columns else "total_harga"
+            hasil[col_harga_r] = pd.to_numeric(hasil[col_harga_r], errors="coerce").fillna(0)
+
             if cari:
                 mask = (
                     hasil["nama_barang"].str.contains(cari, case=False, na=False) |
@@ -1290,56 +1549,74 @@ def page_administrasi(df: pd.DataFrame):
                 hasil = hasil[hasil["status_pembayaran"] == fil_st]
             if fil_bln:
                 hasil = hasil[hasil["tanggal"].astype(str).str.startswith(fil_bln)]
+            if fil_nota:
+                hasil = hasil[hasil["no_nota"].astype(str).str.contains(fil_nota, case=False, na=False)]
 
-            urut = hasil.sort_values(
-                ["tanggal", "no_nota"], ascending=False
-            ) if "tanggal" in hasil.columns else hasil
+            urut = hasil.sort_values(["tanggal","no_nota"], ascending=False) \
+                   if "tanggal" in hasil.columns else hasil
 
-            # ── Tampilan summary per nota ──────────────────────────────────
+            # ── Mode tampilan ─────────────────────────────────────────────────
             view_mode = st.radio(
-                "Tampilan", ["📋 Detail per Item", "🧾 Summary per Nota"],
+                "Mode Tampilan",
+                ["📋 Detail per Item", "🧾 Summary per Nota"],
                 horizontal=True, key="r_view_mode"
             )
+            st.divider()
 
             if view_mode == "🧾 Summary per Nota":
-                # Group by no_nota + tanggal
-                grup_cols = [c for c in ["tanggal","jam_transaksi","no_nota","supplier",
-                                          "nama_pencatat"] if c in urut.columns]
-                if "harga_total" in urut.columns:
-                    urut["harga_total"] = pd.to_numeric(urut["harga_total"], errors="coerce").fillna(0)
                 if "no_nota" in urut.columns:
-                    summary = (
-                        urut.groupby(["tanggal", "no_nota"], dropna=False)
-                        .agg(
-                            supplier    = ("supplier", "first"),
-                            nama_pencatat = ("nama_pencatat", "first") if "nama_pencatat" in urut.columns else ("supplier", "first"),
-                            jumlah_item = ("nama_barang", "count"),
-                            item_list   = ("nama_barang", lambda x: ", ".join(x.dropna().unique()[:5])
-                                           + ("..." if x.nunique() > 5 else "")),
-                            total_harga = ("harga_total", "sum"),
-                        )
-                        .reset_index()
-                        .sort_values("tanggal", ascending=False)
-                    )
+                    urut["harga_total_num"] = pd.to_numeric(urut.get("harga_total", urut.get("total_harga", 0)), errors="coerce").fillna(0)
+                    agg_dict = {
+                        "supplier":     ("supplier", "first"),
+                        "tanggal":      ("tanggal",  "first"),
+                        "nama_pencatat":("nama_pencatat", "first") if "nama_pencatat" in urut.columns else ("supplier","first"),
+                        "jumlah_item":  ("nama_barang", "count"),
+                        "daftar_barang":("nama_barang", lambda x: " · ".join(x.dropna().unique()[:6])
+                                         + ("…" if x.nunique() > 6 else "")),
+                        "total_nota":   ("harga_total_num", "sum"),
+                        "status":       ("status_pembayaran", lambda x: "✅ Lunas" if (x == "Lunas").all()
+                                         else "⚠️ Ada Hutang"),
+                    }
+                    summary = (urut.groupby("no_nota", dropna=False)
+                               .agg(**{k: v for k,v in agg_dict.items()})
+                               .reset_index()
+                               .sort_values("tanggal", ascending=False))
+                    summary.columns = ["No. Nota","Supplier","Tanggal","Pencatat",
+                                       "Jml Item","Daftar Barang","Total (Rp)","Status"]
+                    summary["Total (Rp)"] = summary["Total (Rp)"].apply(lambda x: f"Rp {x:,.0f}")
                     st.dataframe(summary, use_container_width=True, hide_index=True)
+                    st.caption(f"**{len(summary)} nota** dari filter yang aktif")
                 else:
-                    st.info("Kolom no_nota tidak tersedia untuk summary.")
-            else:
-                # Detail per item — kolom disesuaikan dengan skema baru
+                    st.info("Kolom no_nota tidak tersedia.")
+
+            else:  # Detail per item
                 col_priority = [
                     "tanggal", "jam_transaksi", "no_nota", "supplier", "nama_pencatat",
-                    "nama_barang", "merk", "kategori",
+                    "kategori", "sub_kategori", "nama_barang", "merk", "grind_size",
                     "qty", "uom_qty", "vol_per_unit", "uom_vol", "netto_total",
-                    "harga_total",
+                    "harga_total", "total_harga",
                     "tgl_kadaluarsa",
-                    "status_pembayaran",
+                    "status_pembayaran", "catatan",
                 ]
                 cols_show = [c for c in col_priority if c in urut.columns]
                 st.dataframe(urut[cols_show], use_container_width=True, hide_index=True)
 
-            col_total = "harga_total" if "harga_total" in hasil.columns else "total_harga"
-            total_f = pd.to_numeric(hasil.get(col_total, pd.Series()), errors="coerce").sum()
-            st.caption(f"**{len(hasil)}** item · Total: **Rp {total_f:,.0f}**")
+                total_f = pd.to_numeric(
+                    hasil.get(col_harga_r, pd.Series(dtype=float)), errors="coerce"
+                ).sum()
+                st.caption(f"**{len(hasil)} item** ditampilkan · Total: **Rp {total_f:,.0f}**")
+
+            # ── Export ────────────────────────────────────────────────────────
+            if st.session_state.role == "manager" and not hasil.empty:
+                st.divider()
+                csv_data = hasil.to_csv(index=False).encode("utf-8")
+                st.download_button(
+                    "⬇️ Export Hasil Filter ke CSV",
+                    data=csv_data,
+                    file_name=f"riwayat_{st.session_state.cabang}_{date.today()}.csv",
+                    mime="text/csv",
+                    use_container_width=True,
+                )
 
     # ═══════════════════════════════════════════════════════════════════════════
     # TAB 3: KELOLA DATA (Manager only)
@@ -1490,150 +1767,43 @@ def page_administrasi(df: pd.DataFrame):
                 else:
                     st.error('Ketik kata HAPUS (huruf kapital semua) untuk konfirmasi.')
 
-# ─── PAGE: IDENTITAS BARANG ───────────────────────────────────────────────────────
-def page_identitas(df: pd.DataFrame):
-    st.title("🏷️ Identitas Barang")
-
-    if df.empty:
-        empty_state("🏷️", "Belum Ada Barang Tercatat",
-                    "Catat transaksi terlebih dahulu untuk melihat katalog barang.")
-        return
-
-    cf1, cf2 = st.columns(2)
-    with cf1:
-        fil_kat = st.selectbox("Filter Kategori", ["Semua"] + KATEGORI_OPTIONS, key="id_kat")
-    with cf2:
-        cari = st.text_input("Cari Nama Barang / Merk", key="id_cari")
-
-    tampil = df.copy()
-    if fil_kat != "Semua":
-        tampil = tampil[tampil["kategori"] == fil_kat]
-    if cari:
-        tampil = tampil[
-            tampil["nama_barang"].str.contains(cari, case=False, na=False) |
-            tampil["merk"].str.contains(cari, case=False, na=False)
-        ]
-
-    st.markdown("---")
-    st.subheader("📦 Katalog Barang Unik")
-    katalog_cols = [c for c in ["kategori","sub_kategori","nama_barang","merk","grind_size","uom"]
-                    if c in tampil.columns]
-    if not tampil.empty:
-        unik = tampil[katalog_cols].drop_duplicates().sort_values("nama_barang")
-        st.dataframe(unik, use_container_width=True, hide_index=True)
-        st.caption(f"{len(unik)} jenis barang unik")
-    else:
-        st.info("Tidak ada barang sesuai filter.")
-
-    st.markdown("---")
-    col_a, col_b = st.columns(2)
-    with col_a:
-        st.subheader("📊 Transaksi per Sub Kategori")
-        if "sub_kategori" in tampil.columns and not tampil.empty:
-            sub = tampil.groupby(["kategori","sub_kategori"]).size().reset_index(name="Jml Transaksi")
-            st.dataframe(sub.sort_values("Jml Transaksi", ascending=False),
-                         use_container_width=True, hide_index=True)
-
-    with col_b:
-        st.subheader("🔍 Riwayat per Barang")
-        if "nama_barang" in tampil.columns and not tampil.empty:
-            barang_list = sorted(tampil["nama_barang"].dropna().unique().tolist())
-            pilih = st.selectbox("Pilih Barang", barang_list, key="id_barang")
-            detail = tampil[tampil["nama_barang"] == pilih]
-            st.write(f"**{len(detail)} transaksi** untuk *{pilih}*")
-            dc = [c for c in ["tanggal","supplier","merk","qty","uom",
-                               "harga_satuan","total_harga","status_pembayaran"]
-                  if c in detail.columns]
-            st.dataframe(detail[dc], use_container_width=True, hide_index=True)
-
-# ─── PAGE: DETAIL STOK ───────────────────────────────────────────────────────────
-def page_detail_stok(df: pd.DataFrame):
-    st.title("📦 Detail Stok")
-
-    if df.empty:
-        empty_state("📦", "Belum Ada Data Stok",
-                    "Data stok muncul otomatis setelah transaksi dicatat.")
-        return
-
-    df["qty"]          = pd.to_numeric(df["qty"],          errors="coerce").fillna(0)
-    df["harga_satuan"] = pd.to_numeric(df["harga_satuan"], errors="coerce").fillna(0)
-    df["total_harga"]  = pd.to_numeric(df["total_harga"],  errors="coerce").fillna(0)
-
-    st.subheader("💰 Ringkasan Finansial")
-    c1, c2, c3, c4 = st.columns(4)
-    c1.metric("Total Pengeluaran",       f"Rp {df['total_harga'].sum():,.0f}")
-    c2.metric("Rata-rata per Transaksi", f"Rp {df['total_harga'].mean():,.0f}")
-    c3.metric("Transaksi Terbesar",      f"Rp {df['total_harga'].max():,.0f}")
-    c4.metric("Jenis Barang Unik",       df["nama_barang"].nunique() if "nama_barang" in df.columns else 0)
-
-    st.markdown("---")
-    col_kiri, col_kanan = st.columns(2)
-    with col_kiri:
-        st.subheader("📊 Akumulasi Stok per Barang")
-        if "nama_barang" in df.columns:
-            grp = df.groupby(["nama_barang","uom"]).agg(
-                Total_Qty     =("qty",          "sum"),
-                Total_Spend   =("total_harga",  "sum"),
-                Rata_Harga    =("harga_satuan", "mean"),
-                Jml_Transaksi =("total_harga",  "count"),
-            ).reset_index()
-            grp.columns = ["Nama Barang","UoM","Total Qty",
-                           "Total Spend (Rp)","Rata-rata Harga (Rp)","Jml Transaksi"]
-            st.dataframe(grp.sort_values("Total Spend (Rp)", ascending=False),
-                         use_container_width=True, hide_index=True)
-
-    with col_kanan:
-        st.subheader("📈 Tren Harga Satuan")
-        if "nama_barang" in df.columns and not df.empty:
-            pilih = st.selectbox("Pilih barang", sorted(df["nama_barang"].dropna().unique()),
-                                 key="tren_pilih")
-            tren = df[df["nama_barang"] == pilih][["tanggal","harga_satuan"]].copy()
-            tren["tanggal"] = pd.to_datetime(tren["tanggal"], errors="coerce")
-            tren = tren.dropna().sort_values("tanggal")
-            if len(tren) >= 2:
-                st.line_chart(tren.rename(columns={"tanggal":"Tanggal",
-                                                   "harga_satuan":"Harga Satuan (Rp)"})
-                                  .set_index("Tanggal"))
-            elif len(tren) == 1:
-                st.info("Baru 1 catatan harga. Butuh minimal 2 untuk tampilkan tren.")
-            else:
-                st.info("Tidak ada data harga.")
-
-    st.markdown("---")
-    st.subheader("🗓️ Pengeluaran per Bulan")
-    if "tanggal" in df.columns:
-        df["bulan"] = pd.to_datetime(df["tanggal"], errors="coerce").dt.to_period("M").astype(str)
-        monthly = df.groupby("bulan")["total_harga"].sum().reset_index()
-        monthly.columns = ["Bulan", "Total (Rp)"]
-        if not monthly.empty:
-            st.bar_chart(monthly.sort_values("Bulan").set_index("Bulan"))
-
 # ─── PAGE: KONTROL & AUDIT ────────────────────────────────────────────────────────
 def page_kontrol_audit(df: pd.DataFrame):
+    import numpy as np
     st.title("🔍 Kontrol & Audit")
+    st.caption(f"Cabang **{st.session_state.cabang}** · {datetime.now().strftime('%d %b %Y, %H:%M')}")
 
     if df.empty:
         empty_state("🔍", "Belum Ada Data untuk Diaudit",
                     "Data audit muncul setelah transaksi dicatat.")
         return
 
-    df["total_harga"] = pd.to_numeric(df["total_harga"], errors="coerce").fillna(0)
+    col_harga = "harga_total" if "harga_total" in df.columns else "total_harga"
+    df[col_harga] = pd.to_numeric(df[col_harga], errors="coerce").fillna(0)
+    df["qty"]     = pd.to_numeric(df.get("qty", 0), errors="coerce").fillna(0)
+    if "tanggal" in df.columns:
+        df["tanggal_dt"] = pd.to_datetime(df["tanggal"], errors="coerce")
 
-    tab_exp, tab_kas, tab_log = st.tabs([
+    tab_exp, tab_kas, tab_stok, tab_log = st.tabs([
         "⏰ Monitor Kadaluarsa",
         "💳 Arus Kas & Hutang",
+        "📦 Stok & Harga",
         "📋 Audit Log",
     ])
 
-    # ── KADALUARSA ───────────────────────────────────────────────────────────────
+    # ══════════════════════════════════════════════════════════════════════════
+    # TAB 1 — MONITOR KADALUARSA
+    # ══════════════════════════════════════════════════════════════════════════
     with tab_exp:
         st.subheader("📅 Status Kadaluarsa Barang")
         if "tgl_kadaluarsa" not in df.columns:
             st.info("Kolom kadaluarsa tidak tersedia.")
         else:
+            today = pd.Timestamp.today().normalize()
             df_exp = df[
                 df["tgl_kadaluarsa"].notna() &
-                (df["tgl_kadaluarsa"].astype(str).str.strip().isin(["", "None"]) == False)
+                (df["tgl_kadaluarsa"].astype(str).str.strip() != "") &
+                (df["tgl_kadaluarsa"].astype(str).str.strip() != "None")
             ].copy()
 
             if df_exp.empty:
@@ -1641,97 +1811,210 @@ def page_kontrol_audit(df: pd.DataFrame):
                             "Isi kolom Tanggal Kadaluarsa saat mencatat transaksi bahan baku.")
             else:
                 df_exp["tgl_kadaluarsa"] = pd.to_datetime(df_exp["tgl_kadaluarsa"], errors="coerce")
-                today    = pd.Timestamp.today().normalize()
-                kritis   = df_exp[df_exp["tgl_kadaluarsa"] <= today + pd.Timedelta(days=7)]
-                mendekat = df_exp[
-                    (df_exp["tgl_kadaluarsa"] >  today + pd.Timedelta(days=7)) &
-                    (df_exp["tgl_kadaluarsa"] <= today + pd.Timedelta(days=30))
-                ]
-                aman = df_exp[df_exp["tgl_kadaluarsa"] > today + pd.Timedelta(days=30)]
+                sudah_exp  = df_exp[df_exp["tgl_kadaluarsa"] < today]
+                kritis     = df_exp[(df_exp["tgl_kadaluarsa"] >= today) &
+                                    (df_exp["tgl_kadaluarsa"] <= today + pd.Timedelta(days=7))]
+                mendekat   = df_exp[(df_exp["tgl_kadaluarsa"] > today + pd.Timedelta(days=7)) &
+                                    (df_exp["tgl_kadaluarsa"] <= today + pd.Timedelta(days=30))]
+                aman       = df_exp[df_exp["tgl_kadaluarsa"] > today + pd.Timedelta(days=30)]
 
-                c1, c2, c3 = st.columns(3)
-                c1.metric("🔴 Kritis (≤7 hari)",    len(kritis))
-                c2.metric("🟡 Mendekat (8–30 hari)", len(mendekat))
-                c3.metric("🟢 Aman (>30 hari)",      len(aman))
+                ka, kb, kc, kd = st.columns(4)
+                ka.metric("💀 Sudah Kadaluarsa",    len(sudah_exp), delta_color="inverse")
+                kb.metric("🔴 Kritis (≤7 hari)",    len(kritis),    delta_color="inverse")
+                kc.metric("🟡 Mendekat (8–30 hari)", len(mendekat), delta_color="inverse")
+                kd.metric("🟢 Aman (>30 hari)",      len(aman))
 
-                exp_cols = [c for c in ["nama_barang","merk","qty","uom","tgl_kadaluarsa","catatan"]
+                exp_cols = [c for c in ["nama_barang","merk","qty","uom_qty",
+                                        "tgl_kadaluarsa","supplier","catatan"]
                             if c in df_exp.columns]
+
+                if not sudah_exp.empty:
+                    st.error(f"💀 **{len(sudah_exp)} item SUDAH KADALUARSA** — segera singkirkan!")
+                    st.dataframe(sudah_exp[exp_cols].sort_values("tgl_kadaluarsa"),
+                                 use_container_width=True, hide_index=True)
+
                 if not kritis.empty:
-                    st.error("🚨 Barang Kritis — Segera Pakai atau Retur ke Supplier!")
+                    st.error("🚨 Barang Kritis (≤7 hari) — Segera Pakai atau Retur ke Supplier!")
                     st.dataframe(kritis[exp_cols].sort_values("tgl_kadaluarsa"),
                                  use_container_width=True, hide_index=True)
+
                 if not mendekat.empty:
-                    st.warning("⚠️ Akan Kadaluarsa dalam 30 Hari")
+                    st.warning("⚠️ Akan Kadaluarsa 8–30 Hari ke Depan")
                     st.dataframe(mendekat[exp_cols].sort_values("tgl_kadaluarsa"),
                                  use_container_width=True, hide_index=True)
-                if not aman.empty:
-                    with st.expander(f"✅ Barang Aman ({len(aman)} item)"):
-                        st.dataframe(aman[exp_cols].sort_values("tgl_kadaluarsa"),
-                                     use_container_width=True, hide_index=True)
 
-    # ── ARUS KAS ─────────────────────────────────────────────────────────────────
+                with st.expander(f"✅ Barang Aman — {len(aman)} item (>30 hari)"):
+                    st.dataframe(aman[exp_cols].sort_values("tgl_kadaluarsa"),
+                                 use_container_width=True, hide_index=True)
+
+    # ══════════════════════════════════════════════════════════════════════════
+    # TAB 2 — ARUS KAS & HUTANG
+    # ══════════════════════════════════════════════════════════════════════════
     with tab_kas:
-        st.subheader("💸 Ringkasan Arus Kas Keluar")
-        total_all    = df["total_harga"].sum()
-        total_lunas  = df[df["status_pembayaran"] == "Lunas"]["total_harga"].sum()
-        total_hutang = df[df["status_pembayaran"].str.contains("Tempo|DP", na=False)]["total_harga"].sum()
+        st.subheader("💸 Arus Kas Keluar & Status Pembayaran")
 
-        c1, c2, c3 = st.columns(3)
-        c1.metric("Total Keluar",             f"Rp {total_all:,.0f}")
-        c2.metric("✅ Sudah Lunas",            f"Rp {total_lunas:,.0f}")
-        c3.metric("⏳ Belum Lunas / Hutang",  f"Rp {total_hutang:,.0f}")
+        total_all    = df[col_harga].sum()
+        total_lunas  = df[df["status_pembayaran"] == "Lunas"][col_harga].sum() if "status_pembayaran" in df.columns else 0
+        total_hutang = df[df["status_pembayaran"].str.contains("Tempo|DP", na=False)][col_harga].sum() if "status_pembayaran" in df.columns else 0
+        rasio_lunas  = total_lunas / total_all * 100 if total_all > 0 else 0
 
-        st.markdown("---")
-        st.subheader("📋 Transaksi Belum Lunas")
-        belum = df[df["status_pembayaran"] != "Lunas"]
-        if not belum.empty:
-            bl_cols = [c for c in ["tanggal","no_nota","supplier","nama_barang",
-                                   "total_harga","status_pembayaran","catatan"]
-                       if c in belum.columns]
-            bl_sorted = belum[bl_cols].sort_values("tanggal") if "tanggal" in belum.columns else belum[bl_cols]
-            st.dataframe(bl_sorted, use_container_width=True, hide_index=True)
-            st.caption(f"Total hutang: **Rp {total_hutang:,.0f}**")
-        else:
-            st.success("Semua transaksi sudah berstatus Lunas!")
+        k1, k2, k3, k4 = st.columns(4)
+        k1.metric("💰 Total Keluar",       f"Rp {total_all:,.0f}")
+        k2.metric("✅ Sudah Lunas",         f"Rp {total_lunas:,.0f}")
+        k3.metric("⏳ Belum Lunas",         f"Rp {total_hutang:,.0f}", delta_color="inverse")
+        k4.metric("📊 Rasio Lunas",         f"{rasio_lunas:.1f}%")
 
-        if st.session_state.role == "manager":
-            st.markdown("---")
-            st.subheader("📊 Pengeluaran per Supplier")
-            sup_grp = df.groupby(["supplier","status_pembayaran"])["total_harga"].sum().reset_index()
-            sup_grp.columns = ["Supplier","Status","Total (Rp)"]
-            st.dataframe(sup_grp.sort_values("Total (Rp)", ascending=False),
+        st.divider()
+        col_h1, col_h2 = st.columns(2)
+
+        with col_h1:
+            st.markdown("**📋 Transaksi Belum Lunas**")
+            belum = df[df["status_pembayaran"] != "Lunas"] if "status_pembayaran" in df.columns else pd.DataFrame()
+            if not belum.empty:
+                bl_cols = [c for c in ["tanggal","jam_transaksi","no_nota","supplier",
+                                       "nama_barang","harga_total","total_harga",
+                                       "status_pembayaran","catatan"]
+                           if c in belum.columns]
+                st.dataframe(belum[bl_cols].sort_values("tanggal") if "tanggal" in belum.columns
+                             else belum[bl_cols],
+                             use_container_width=True, hide_index=True)
+            else:
+                st.success("✅ Semua transaksi sudah berstatus Lunas!")
+
+        with col_h2:
+            st.markdown("**🏪 Pengeluaran per Supplier**")
+            if "supplier" in df.columns:
+                sup_stat = (df.groupby(["supplier","status_pembayaran"])[col_harga]
+                            .sum().reset_index()
+                            .sort_values(col_harga, ascending=False))
+                sup_stat.columns = ["Supplier","Status","Total (Rp)"]
+                sup_stat["Total (Rp)"] = sup_stat["Total (Rp)"].apply(lambda x: f"Rp {x:,.0f}")
+                st.dataframe(sup_stat, use_container_width=True, hide_index=True)
+
+        # Pengeluaran per bulan breakdown
+        st.divider()
+        st.markdown("**📅 Rekap Bulanan**")
+        if "tanggal_dt" in df.columns:
+            df["bulan_str"] = df["tanggal_dt"].dt.to_period("M").astype(str)
+            rek = (df.groupby(["bulan_str","status_pembayaran"])[col_harga]
+                   .sum().reset_index()
+                   .rename(columns={"bulan_str":"Bulan","status_pembayaran":"Status",
+                                    col_harga:"Total (Rp)"}))
+            st.dataframe(rek.sort_values("Bulan", ascending=False),
                          use_container_width=True, hide_index=True)
 
-    # ── AUDIT LOG ────────────────────────────────────────────────────────────────
+    # ══════════════════════════════════════════════════════════════════════════
+    # TAB 3 — STOK & HARGA (konten dari page_detail_stok lama)
+    # ══════════════════════════════════════════════════════════════════════════
+    with tab_stok:
+        st.subheader("📦 Ringkasan Stok & Analisis Harga")
+
+        s1, s2, s3, s4 = st.columns(4)
+        s1.metric("💰 Total Pengeluaran",     f"Rp {df[col_harga].sum():,.0f}")
+        s2.metric("📊 Rata-rata per Transaksi",f"Rp {df[col_harga].mean():,.0f}")
+        s3.metric("🏆 Transaksi Terbesar",     f"Rp {df[col_harga].max():,.0f}")
+        s4.metric("🗂️ Jenis Barang Unik",     df["nama_barang"].nunique() if "nama_barang" in df.columns else 0)
+
+        st.divider()
+        col_s1, col_s2 = st.columns(2)
+
+        with col_s1:
+            st.markdown("**📊 Akumulasi Stok per Barang**")
+            if "nama_barang" in df.columns:
+                uom_col = "uom_qty" if "uom_qty" in df.columns else "uom"
+                grp = df.groupby(["nama_barang"]).agg(
+                    Total_Qty     =("qty",        "sum"),
+                    Total_Spend   =(col_harga,    "sum"),
+                    Jml_Transaksi =(col_harga,    "count"),
+                ).reset_index()
+                grp.columns = ["Nama Barang","Total Qty","Total Spend (Rp)","Jml Transaksi"]
+                grp["Total Spend (Rp)"] = grp["Total Spend (Rp)"].apply(lambda x: f"Rp {x:,.0f}")
+                st.dataframe(grp.sort_values("Jml Transaksi", ascending=False),
+                             use_container_width=True, hide_index=True)
+
+        with col_s2:
+            st.markdown("**📈 Tren Harga + Volatilitas**")
+            if "nama_barang" in df.columns and "tanggal_dt" in df.columns:
+                pilih = st.selectbox("Pilih barang", sorted(df["nama_barang"].dropna().unique()),
+                                     key="ka_tren_pilih")
+                tren = df[df["nama_barang"] == pilih][["tanggal_dt", col_harga, "qty"]].copy()
+                tren = tren.dropna(subset=["tanggal_dt"]).sort_values("tanggal_dt")
+                tren["qty_safe"] = tren["qty"].replace(0, np.nan)
+                tren["harga_pu"] = tren[col_harga] / tren["qty_safe"]
+                tren = tren.dropna(subset=["harga_pu"]).set_index("tanggal_dt")
+
+                if len(tren) >= 2:
+                    tren["MA3"] = tren["harga_pu"].rolling(3, min_periods=1).mean()
+                    st.line_chart(tren[["harga_pu","MA3"]], use_container_width=True)
+                    mu = tren["harga_pu"].mean(); std = tren["harga_pu"].std()
+                    cv = std / mu * 100 if mu > 0 else 0
+                    st.caption(f"μ={mu:,.0f} · σ={std:,.0f} · CV={cv:.1f}%")
+                elif len(tren) == 1:
+                    st.info("Butuh ≥2 transaksi untuk grafik tren.")
+                else:
+                    st.info("Tidak ada data harga untuk produk ini.")
+
+        st.divider()
+        st.markdown("**🗓️ Pengeluaran per Bulan**")
+        if "tanggal_dt" in df.columns:
+            monthly = (df.assign(bulan=df["tanggal_dt"].dt.to_period("M").astype(str))
+                       .groupby("bulan")[col_harga].sum().reset_index()
+                       .sort_values("bulan"))
+            monthly.columns = ["Bulan", "Total (Rp)"]
+            if not monthly.empty:
+                st.bar_chart(monthly.set_index("Bulan"), use_container_width=True)
+
+    # ══════════════════════════════════════════════════════════════════════════
+    # TAB 4 — AUDIT LOG
+    # ══════════════════════════════════════════════════════════════════════════
     with tab_log:
         st.subheader("📋 Log Seluruh Transaksi")
 
-        lf1, lf2, lf3 = st.columns(3)
+        lf1, lf2, lf3, lf4 = st.columns(4)
         with lf1:
-            kat_f  = st.selectbox("Kategori", ["Semua"] + KATEGORI_OPTIONS, key="log_kat")
+            kat_f     = st.selectbox("Kategori", ["Semua"] + KATEGORI_OPTIONS, key="log_kat")
         with lf2:
-            sort_f = st.selectbox("Urutkan", ["tanggal","total_harga","supplier","nama_barang"],
-                                  key="log_sort")
+            sort_f    = st.selectbox("Urutkan",
+                                     [c for c in ["tanggal","harga_total","total_harga",
+                                                   "supplier","nama_barang"] if c in df.columns],
+                                     key="log_sort")
         with lf3:
-            asc_f  = st.selectbox("Urutan", ["Terbaru dulu","Terlama dulu"], key="log_asc")
+            asc_f     = st.selectbox("Urutan", ["Terbaru dulu","Terlama dulu"], key="log_asc")
+        with lf4:
+            cari_log  = st.text_input("Cari barang/supplier", key="log_cari")
 
         log_df = df.copy()
         if kat_f != "Semua":
             log_df = log_df[log_df["kategori"] == kat_f]
+        if cari_log:
+            log_df = log_df[
+                log_df["nama_barang"].str.contains(cari_log, case=False, na=False) |
+                log_df["supplier"].str.contains(cari_log, case=False, na=False)
+            ]
         if sort_f in log_df.columns:
             log_df = log_df.sort_values(sort_f, ascending=(asc_f == "Terlama dulu"))
 
-        st.dataframe(log_df, use_container_width=True, hide_index=True)
-        st.caption(f"{len(log_df)} catatan ditampilkan")
+        # Kolom audit yang relevan
+        audit_cols = [c for c in [
+            "id","tanggal","jam_transaksi","no_nota","supplier","nama_pencatat",
+            "kategori","sub_kategori","nama_barang","merk","grind_size",
+            "qty","uom_qty","vol_per_unit","uom_vol","netto_total",
+            "harga_total","total_harga",
+            "tgl_kadaluarsa","status_pembayaran","catatan","created_at"
+        ] if c in log_df.columns]
+
+        st.dataframe(log_df[audit_cols], use_container_width=True, hide_index=True)
+        st.caption(f"{len(log_df)} baris ditampilkan")
 
         if st.session_state.role == "manager":
             st.markdown("---")
-            csv = log_df.to_csv(index=False).encode("utf-8")
+            csv = log_df[audit_cols].to_csv(index=False).encode("utf-8")
             st.download_button(
                 label="⬇️ Export CSV",
                 data=csv,
-                file_name=f"inventaris_{st.session_state.cabang}_{date.today()}.csv",
+                file_name=f"audit_{st.session_state.cabang}_{date.today()}.csv",
                 mime="text/csv",
+                use_container_width=True,
             )
 
 # ─── MAIN ────────────────────────────────────────────────────────────────────────
@@ -1745,8 +2028,6 @@ def main():
 
     if   page == "📊 Dashboard":        page_dashboard(df)
     elif page == "📋 Administrasi":     page_administrasi(df)
-    elif page == "🏷️ Identitas Barang": page_identitas(df)
-    elif page == "📦 Detail Stok":      page_detail_stok(df)
     elif page == "🔍 Kontrol & Audit":  page_kontrol_audit(df)
 
 if __name__ == "__main__":
