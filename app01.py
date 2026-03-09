@@ -26,8 +26,9 @@ supabase = init_supabase()
 # ─── CUSTOM CSS ──────────────────────────────────────────────────────────────────
 st.markdown("""
 <style>
+    /* ── Sidebar ── */
     [data-testid="stSidebar"] {
-        background: linear-gradient(180deg, #1a1a2e 0%, #16213e 60%, #0f3460 100%);
+        background: linear-gradient(180deg, #0f172a 0%, #1e293b 60%, #0f3460 100%);
     }
     [data-testid="stSidebar"] * { color: white !important; }
     [data-testid="stSidebar"] .stRadio > div { gap: 4px; }
@@ -38,13 +39,96 @@ st.markdown("""
         transition: background 0.2s;
     }
     [data-testid="stSidebar"] .stRadio label:hover { background: rgba(255,255,255,0.14); }
+
+    /* ── Default metric cards ── */
     div[data-testid="metric-container"] {
         background: #f8fafc;
-        border-radius: 10px;
-        padding: 1rem;
+        border-radius: 12px;
+        padding: 1rem 1.2rem;
         border-left: 4px solid #667eea;
-        box-shadow: 0 1px 4px rgba(0,0,0,0.07);
+        box-shadow: 0 2px 8px rgba(0,0,0,0.07);
     }
+
+    /* ── Professional KPI flashcards ── */
+    .kpi-card {
+        border-radius: 14px;
+        padding: 1.1rem 1.3rem;
+        margin-bottom: 0.5rem;
+        box-shadow: 0 3px 12px rgba(0,0,0,0.10);
+        position: relative;
+        overflow: hidden;
+    }
+    .kpi-card::before {
+        content: '';
+        position: absolute;
+        top: 0; right: 0;
+        width: 80px; height: 80px;
+        border-radius: 50%;
+        opacity: 0.12;
+        transform: translate(20px, -20px);
+    }
+    .kpi-card .kpi-icon  { font-size: 1.6rem; margin-bottom: 0.3rem; display: block; }
+    .kpi-card .kpi-label { font-size: 0.72rem; font-weight: 600; text-transform: uppercase;
+                           letter-spacing: 0.07em; opacity: 0.75; margin-bottom: 0.15rem; }
+    .kpi-card .kpi-value { font-size: 1.45rem; font-weight: 800; line-height: 1.2; }
+    .kpi-card .kpi-sub   { font-size: 0.78rem; margin-top: 0.3rem; opacity: 0.80; }
+
+    /* Warna tema per card */
+    .kpi-blue   { background: linear-gradient(135deg, #1e40af, #3b82f6); color: white; }
+    .kpi-green  { background: linear-gradient(135deg, #065f46, #10b981); color: white; }
+    .kpi-red    { background: linear-gradient(135deg, #991b1b, #ef4444); color: white; }
+    .kpi-orange { background: linear-gradient(135deg, #92400e, #f59e0b); color: white; }
+    .kpi-purple { background: linear-gradient(135deg, #4c1d95, #8b5cf6); color: white; }
+    .kpi-teal   { background: linear-gradient(135deg, #134e4a, #14b8a6); color: white; }
+    .kpi-slate  { background: linear-gradient(135deg, #1e293b, #475569); color: white; }
+    .kpi-rose   { background: linear-gradient(135deg, #881337, #f43f5e); color: white; }
+
+    /* ── Section header ── */
+    .section-header {
+        font-size: 0.78rem;
+        font-weight: 800;
+        text-transform: uppercase;
+        letter-spacing: 0.1em;
+        color: #64748b;
+        margin: 1.2rem 0 0.6rem;
+        padding-bottom: 0.3rem;
+        border-bottom: 2px solid #e2e8f0;
+    }
+
+    /* ── Alert banner ── */
+    .alert-banner {
+        border-radius: 10px;
+        padding: 0.8rem 1.1rem;
+        margin: 0.5rem 0;
+        font-size: 0.88rem;
+        font-weight: 600;
+        display: flex;
+        align-items: center;
+        gap: 0.6rem;
+    }
+    .alert-critical { background: #fee2e2; border-left: 4px solid #ef4444; color: #7f1d1d; }
+    .alert-warning  { background: #fef3c7; border-left: 4px solid #f59e0b; color: #78350f; }
+    .alert-ok       { background: #dcfce7; border-left: 4px solid #22c55e; color: #14532d; }
+
+    /* ── Manager pusat badge ── */
+    .role-badge-pusat {
+        background: linear-gradient(135deg, #7c3aed, #c026d3);
+        color: white;
+        border-radius: 20px;
+        padding: 2px 10px;
+        font-size: 0.72rem;
+        font-weight: 700;
+    }
+    .role-badge-mgr {
+        background: linear-gradient(135deg, #0f766e, #0891b2);
+        color: white;
+        border-radius: 20px;
+        padding: 2px 10px;
+        font-size: 0.72rem;
+        font-weight: 700;
+    }
+
+    /* ── Empty state ── */
     .empty-state {
         text-align: center;
         padding: 3rem 2rem;
@@ -67,6 +151,16 @@ st.markdown("""
         margin-bottom: 0.6rem;
         margin-top: 0.4rem;
     }
+
+    /* ── Cabang comparison card ── */
+    .cabang-card {
+        background: #f1f5f9;
+        border-radius: 12px;
+        padding: 1rem 1.2rem;
+        margin-bottom: 0.5rem;
+        border: 1px solid #e2e8f0;
+    }
+    .cabang-card h4 { margin: 0 0 0.5rem; color: #1e293b; font-size: 1rem; }
 </style>
 """, unsafe_allow_html=True)
 
@@ -619,12 +713,16 @@ KOLOM_DB = [
 # ─── SESSION STATE ───────────────────────────────────────────────────────────────
 def init_session():
     defaults = {
-        "logged_in":  False,
-        "role":       None,
-        "cabang":     None,
-        "username":   None,
-        "local_data": [],
-        "next_id":    1,
+        "logged_in":         False,
+        "role":              None,
+        "cabang":            None,
+        "username":          None,
+        "local_data":        [],
+        "next_id":           1,
+        # Set of row IDs that have been "restocked" / dismissed from expiry alert
+        "dismissed_expiry":  set(),
+        # Log catatan restock: list of {id, nama_barang, tgl_restock, catatan, user}
+        "restock_log":       [],
     }
     for k, v in defaults.items():
         if k not in st.session_state:
@@ -642,6 +740,17 @@ def empty_state(icon: str, title: str, subtitle: str):
     </div>
     """, unsafe_allow_html=True)
 
+def kpi_card(col, icon: str, label: str, value: str, sub: str = "", theme: str = "kpi-blue"):
+    """Render sebuah KPI flashcard profesional di dalam kolom Streamlit yang diberikan."""
+    col.markdown(f"""
+    <div class="kpi-card {theme}">
+        <span class="kpi-icon">{icon}</span>
+        <div class="kpi-label">{label}</div>
+        <div class="kpi-value">{value}</div>
+        {"<div class='kpi-sub'>" + sub + "</div>" if sub else ""}
+    </div>
+    """, unsafe_allow_html=True)
+
 # ─── DB HELPERS ──────────────────────────────────────────────────────────────────
 def get_data(cabang: str) -> pd.DataFrame:
     if supabase:
@@ -652,6 +761,13 @@ def get_data(cabang: str) -> pd.DataFrame:
             st.warning(f"Gagal memuat data dari Supabase: {e}")
     rows = [r for r in st.session_state.local_data if r.get("cabang") == cabang]
     return pd.DataFrame(rows) if rows else pd.DataFrame(columns=KOLOM_DB)
+
+def get_data_all_cabang() -> dict:
+    """Kembalikan dict {cabang: DataFrame} untuk semua cabang (WKA & Buper)."""
+    return {
+        "WKA":   get_data("WKA"),
+        "Buper": get_data("Buper"),
+    }
 
 def insert_row(data: dict) -> bool:
     if supabase:
@@ -703,9 +819,19 @@ def login_check(username: str, password: str):
             res = supabase.table("users").select("*").eq("username", username).eq("password", password).execute()
             if res.data:
                 u = res.data[0]
-                return u["role"], u["cabang"]
+                return u["role"], u.get("cabang", "PUSAT")
         except Exception as e:
             st.warning(f"Supabase belum terhubung: {e}")
+    # ── Demo fallback (tanpa Supabase) ──────────────────────────────────────
+    DEMO_USERS = {
+        "kasir_wka":    ("kasir",          "WKA"),
+        "kasir_buper":  ("kasir",          "Buper"),
+        "manager_wka":  ("manager",        "WKA"),
+        "manager_buper":("manager",        "Buper"),
+        "pusat":        ("manager_pusat",  "PUSAT"),
+    }
+    if username in DEMO_USERS and password == "demo123":
+        return DEMO_USERS[username]
     return None, None
 
 # ─── LOGIN ───────────────────────────────────────────────────────────────────────
@@ -748,41 +874,65 @@ def show_login():
             st.markdown("""
             <div style='background:#fff7ed;border:1px solid #fed7aa;border-radius:8px;
                         padding:0.8rem 1rem;margin-top:1rem;font-size:0.82rem;color:#9a3412;'>
-            Supabase belum terhubung. Tambahkan <code>SUPABASE_URL</code> dan <code>SUPABASE_KEY</code>
-            di file <code>.streamlit/secrets.toml</code>.
+            <b>Mode Demo</b> — Supabase belum terhubung.<br>
+            Gunakan akun berikut (password: <code>demo123</code>):<br>
+            · <code>kasir_wka</code> / <code>kasir_buper</code> — Kasir<br>
+            · <code>manager_wka</code> / <code>manager_buper</code> — Manager Cabang<br>
+            · <code>pusat</code> — 🏢 <b>Manager Pusat</b> (pantau WKA &amp; Buper)
             </div>
             """, unsafe_allow_html=True)
 
 # ─── SIDEBAR ─────────────────────────────────────────────────────────────────────
 def show_sidebar():
     with st.sidebar:
+        role   = st.session_state.role
+        cabang = st.session_state.cabang
+
         st.markdown(f"""
         <div style='text-align:center;padding:1rem 0 0.8rem;
                     border-bottom:1px solid rgba(255,255,255,0.15);margin-bottom:1rem;'>
             <div style='font-size:2.2rem;'>☕</div>
             <div style='font-size:1rem;font-weight:700;margin-top:4px;'>Inventaris Kafe</div>
             <div style='font-size:0.75rem;opacity:0.6;margin-top:2px;'>
-                Cabang {st.session_state.cabang}
+                {"Semua Cabang" if role == "manager_pusat" else f"Cabang {cabang}"}
             </div>
         </div>
         """, unsafe_allow_html=True)
 
-        icon = "👑" if st.session_state.role == "manager" else "🧑‍💼"
+        if role == "manager_pusat":
+            icon   = "🏢"
+            badge  = '<span class="role-badge-pusat">Manager Pusat</span>'
+        elif role == "manager":
+            icon   = "👑"
+            badge  = '<span class="role-badge-mgr">Manager</span>'
+        else:
+            icon   = "🧑‍💼"
+            badge  = ""
+
         st.markdown(f"""
         <div style='background:rgba(255,255,255,0.09);border-radius:10px;
                     padding:0.6rem 0.8rem;margin-bottom:1.2rem;font-size:0.85rem;'>
-            {icon} <b>{st.session_state.username}</b><br>
+            {icon} <b>{st.session_state.username}</b>&nbsp;{badge}<br>
             <span style='opacity:0.6;font-size:0.75rem;'>
-                {st.session_state.role.title()} · Cabang {st.session_state.cabang}
+                {"Pemantau Lintas Cabang" if role == "manager_pusat" else f"Cabang {cabang}"}
             </span>
         </div>
         """, unsafe_allow_html=True)
 
-        pages = [
-            "📊 Dashboard",
-            "📋 Administrasi",
-            "🔍 Kontrol & Audit",
-        ]
+        if role == "manager_pusat":
+            pages = [
+                "🏢 Pusat — Overview",
+                "📊 Dashboard WKA",
+                "📊 Dashboard Buper",
+                "📈 Perbandingan Cabang",
+            ]
+        else:
+            pages = [
+                "📊 Dashboard",
+                "📋 Administrasi",
+                "🔍 Kontrol & Audit",
+            ]
+
         page = st.radio("Menu", pages, label_visibility="collapsed")
 
         st.markdown("<div style='margin-top:2rem;border-top:1px solid rgba(255,255,255,0.1);padding-top:1rem;'></div>",
@@ -1113,29 +1263,297 @@ def page_dashboard(df: pd.DataFrame):
                 for sup, val in ht.items():
                     st.markdown(f"• **{sup}**: Rp {val:,.0f}")
 
-    with col_exp:
-        st.markdown("**🗓️ Kadaluarsa Terdekat**")
-        if "tgl_kadaluarsa" in df.columns and not df_exp.empty if "df_exp" in dir() else False:
-            pass
-        # re-compute untuk tampilan ini
-        if "tgl_kadaluarsa" in df.columns:
-            _exp = df[df["tgl_kadaluarsa"].notna() &
-                      (df["tgl_kadaluarsa"].astype(str).str.strip() != "") &
-                      (df["tgl_kadaluarsa"].astype(str).str.strip() != "None")].copy()
-            if not _exp.empty:
-                _exp["tgl_kadaluarsa"] = pd.to_datetime(_exp["tgl_kadaluarsa"], errors="coerce")
-                _soon = _exp[_exp["tgl_kadaluarsa"] <= today + pd.Timedelta(days=30)].sort_values("tgl_kadaluarsa")
-                if not _soon.empty:
-                    for _, r in _soon.head(6).iterrows():
-                        sisa = (r["tgl_kadaluarsa"] - today).days
-                        icon = "🔴" if sisa <= 7 else "🟡"
-                        nama = r.get("nama_barang", "-")
-                        st.markdown(f"{icon} **{nama}** — sisa **{sisa} hari** "
-                                    f"({r['tgl_kadaluarsa'].strftime('%d %b %Y')})")
-                else:
-                    st.success("✅ Tidak ada barang yang kadaluarsa dalam 30 hari ke depan.")
+# ─── PAGE: DASHBOARD ─────────────────────────────────────────────────────────────
+def page_dashboard(df: pd.DataFrame, cabang_label: str = None):
+    import numpy as np
+
+    cabang = cabang_label or st.session_state.cabang
+    now_str = datetime.now().strftime("%A, %d %B %Y · %H:%M")
+    st.title("📊 Dashboard")
+    st.caption(f"Cabang **{cabang}** · {now_str}")
+
+    if df.empty:
+        empty_state("📊", "Belum Ada Data",
+                    "Mulai catat transaksi pertama di halaman Administrasi.")
+        return
+
+    # ── Normalisasi kolom numerik ─────────────────────────────────────────────
+    col_harga = "harga_total" if "harga_total" in df.columns else "total_harga"
+    df[col_harga] = pd.to_numeric(df[col_harga], errors="coerce").fillna(0)
+    df["qty"]     = pd.to_numeric(df.get("qty", 0), errors="coerce").fillna(0)
+    if "tanggal" in df.columns:
+        df["tanggal_dt"] = pd.to_datetime(df["tanggal"], errors="coerce")
+        df["bulan"]      = df["tanggal_dt"].dt.to_period("M").astype(str)
+        df["minggu"]     = df["tanggal_dt"].dt.to_period("W").astype(str)
+
+    today       = pd.Timestamp.today().normalize()
+    bulan_ini   = today.to_period("M").strftime("%Y-%m")
+    bulan_lalu  = (today - pd.DateOffset(months=1)).to_period("M").strftime("%Y-%m")
+
+    total_keluar   = df[col_harga].sum()
+    total_bln_ini  = df[df["bulan"] == bulan_ini][col_harga].sum()  if "bulan" in df.columns else 0
+    total_bln_lalu = df[df["bulan"] == bulan_lalu][col_harga].sum() if "bulan" in df.columns else 0
+    delta_bln      = total_bln_ini - total_bln_lalu
+    total_trx      = len(df)
+    total_hutang   = df[df["status_pembayaran"].str.contains("Tempo|DP", na=False)][col_harga].sum() if "status_pembayaran" in df.columns else 0
+    jenis_barang   = df["nama_barang"].nunique() if "nama_barang" in df.columns else 0
+    total_qty_all  = df["qty"].sum()
+
+    # ── Kadaluarsa alert (filter yg sdh di-dismiss/restock) ──────────────────
+    dismissed = st.session_state.dismissed_expiry
+    n_kritis = n_mendekat = n_sudah_exp = 0
+    df_exp_active = pd.DataFrame()
+
+    if "tgl_kadaluarsa" in df.columns:
+        _mask = (df["tgl_kadaluarsa"].notna() &
+                 (df["tgl_kadaluarsa"].astype(str).str.strip() != "") &
+                 (df["tgl_kadaluarsa"].astype(str).str.strip() != "None"))
+        df_exp_all = df[_mask].copy()
+        if not df_exp_all.empty:
+            df_exp_all["tgl_kadaluarsa"] = pd.to_datetime(df_exp_all["tgl_kadaluarsa"], errors="coerce")
+            # Filter produk yang SUDAH direstock/dismissed
+            if "id" in df_exp_all.columns:
+                df_exp_active = df_exp_all[~df_exp_all["id"].isin(dismissed)]
             else:
-                st.info("Belum ada data kadaluarsa dicatat.")
+                df_exp_active = df_exp_all
+            n_sudah_exp = len(df_exp_active[df_exp_active["tgl_kadaluarsa"] <  today])
+            n_kritis    = len(df_exp_active[df_exp_active["tgl_kadaluarsa"] <= today + pd.Timedelta(days=7)])
+            n_mendekat  = len(df_exp_active[
+                (df_exp_active["tgl_kadaluarsa"] > today + pd.Timedelta(days=7)) &
+                (df_exp_active["tgl_kadaluarsa"] <= today + pd.Timedelta(days=30))
+            ])
+
+    # ── Stok per kategori ─────────────────────────────────────────────────────
+    qty_minuman   = df[df["kategori"] == "Bahan Baku Minuman"]["qty"].sum()  if "kategori" in df.columns else 0
+    qty_makanan   = df[df["kategori"] == "Bahan Baku Makanan"]["qty"].sum()  if "kategori" in df.columns else 0
+    qty_packaging = df[df["kategori"] == "Packaging"]["qty"].sum()            if "kategori" in df.columns else 0
+
+    # ── Transaksi hari ini ────────────────────────────────────────────────────
+    trx_hari_ini = len(df[df["tanggal"] == today.strftime("%Y-%m-%d")]) if "tanggal" in df.columns else 0
+
+    # ═══════════════════════════════════════════════════════════════════════════
+    # BARIS 1: ALERT KRITIS (banner merah/kuning jika ada masalah)
+    # ═══════════════════════════════════════════════════════════════════════════
+    if n_kritis > 0 or n_sudah_exp > 0:
+        st.markdown(f"""
+        <div class="alert-banner alert-critical">
+            🚨 <span><b>{n_sudah_exp} item SUDAH KADALUARSA</b> · <b>{n_kritis} item kritis ≤7 hari</b>
+            — Segera cek tab Kontrol & Audit atau gunakan tombol Konfirmasi Restock di bawah!</span>
+        </div>""", unsafe_allow_html=True)
+    elif n_mendekat > 0:
+        st.markdown(f"""
+        <div class="alert-banner alert-warning">
+            ⚠️ <span><b>{n_mendekat} item</b> akan kadaluarsa dalam 30 hari ke depan. Pantau stok!</span>
+        </div>""", unsafe_allow_html=True)
+    else:
+        st.markdown("""
+        <div class="alert-banner alert-ok">
+            ✅ <span>Semua stok dalam status aman. Tidak ada kadaluarsa mendesak.</span>
+        </div>""", unsafe_allow_html=True)
+
+    st.markdown('<div class="section-header">📦 STATUS STOK BAHAN BAKU & PACKAGING</div>', unsafe_allow_html=True)
+
+    # ═══════════════════════════════════════════════════════════════════════════
+    # BARIS 2: KPI CARDS — STOK
+    # ═══════════════════════════════════════════════════════════════════════════
+    r1c1, r1c2, r1c3, r1c4 = st.columns(4)
+    kpi_card(r1c1, "☕", "Bahan Baku Minuman",  f"{qty_minuman:,.0f} unit",  "Total qty diterima", "kpi-blue")
+    kpi_card(r1c2, "🍛", "Bahan Baku Makanan",  f"{qty_makanan:,.0f} unit",  "Total qty diterima", "kpi-teal")
+    kpi_card(r1c3, "📦", "Packaging",           f"{qty_packaging:,.0f} unit","Total qty diterima", "kpi-purple")
+    kpi_card(r1c4, "🏷️", "Jenis Produk Unik",  f"{jenis_barang} jenis",     "Dari semua kategori","kpi-slate")
+
+    st.markdown('<div class="section-header">⚠️ MONITOR KADALUARSA & RESTOCK</div>', unsafe_allow_html=True)
+
+    # ═══════════════════════════════════════════════════════════════════════════
+    # BARIS 3: KPI CARDS — KADALUARSA
+    # ═══════════════════════════════════════════════════════════════════════════
+    r2c1, r2c2, r2c3, r2c4 = st.columns(4)
+    kpi_card(r2c1, "💀", "Sudah Kadaluarsa",     f"{n_sudah_exp} item",   "Segera singkirkan!",      "kpi-red")
+    kpi_card(r2c2, "🔴", "Kritis ≤7 Hari",       f"{n_kritis} item",     "Prioritas segera pakai",  "kpi-rose")
+    kpi_card(r2c3, "🟡", "Mendekat 8–30 Hari",   f"{n_mendekat} item",   "Pantau penggunaan",       "kpi-orange")
+    kpi_card(r2c4, "🔕", "Sudah Direstock",       f"{len(dismissed)} item","Tidak ditampilkan lagi", "kpi-green")
+
+    # ── Mini tabel kadaluarsa terdekat (aktif/belum dismiss) ─────────────────
+    if not df_exp_active.empty:
+        _soon = df_exp_active[
+            df_exp_active["tgl_kadaluarsa"] <= today + pd.Timedelta(days=30)
+        ].sort_values("tgl_kadaluarsa").head(5)
+        if not _soon.empty:
+            st.markdown("**🗓️ 5 Item Paling Mendesak:**")
+            for _, r in _soon.iterrows():
+                sisa = (r["tgl_kadaluarsa"] - today).days
+                if sisa < 0:
+                    icon = "💀"; warna = "#fee2e2"; teks = f"SUDAH KADALUARSA {abs(sisa)} hari lalu"
+                elif sisa <= 7:
+                    icon = "🔴"; warna = "#fee2e2"; teks = f"Sisa **{sisa} hari**"
+                else:
+                    icon = "🟡"; warna = "#fef3c7"; teks = f"Sisa **{sisa} hari**"
+                nama = r.get("nama_barang", "-")
+                tgl_str = r["tgl_kadaluarsa"].strftime("%d %b %Y")
+                st.markdown(
+                    f"<div style='background:{warna};border-radius:8px;padding:6px 12px;"
+                    f"margin:3px 0;font-size:0.87rem;'>"
+                    f"{icon} <b>{nama}</b> — {teks} · Exp: {tgl_str}</div>",
+                    unsafe_allow_html=True
+                )
+
+    # ═══════════════════════════════════════════════════════════════════════════
+    # FITUR RESTOCK: Konfirmasi bahwa barang sudah di-restock / tidak kadaluarsa lagi
+    # ═══════════════════════════════════════════════════════════════════════════
+    if not df_exp_active.empty and n_kritis + n_sudah_exp > 0:
+        with st.expander("✅ Konfirmasi Restock — Hilangkan Alert Kadaluarsa", expanded=False):
+            st.info(
+                "**Cara pakai:** Pilih item yang sudah di-restock atau sudah dibuang/diretur. "
+                "Item ini tidak akan muncul lagi di alert kadaluarsa. "
+                "Data transaksi asli tetap tersimpan di database."
+            )
+            alert_items = df_exp_active[
+                df_exp_active["tgl_kadaluarsa"] <= today + pd.Timedelta(days=30)
+            ].sort_values("tgl_kadaluarsa")
+
+            if "id" in alert_items.columns:
+                opts = {
+                    str(row["id"]): f"{row.get('nama_barang','-')} | Exp: {row['tgl_kadaluarsa'].strftime('%d %b %Y')}"
+                    for _, row in alert_items.iterrows()
+                }
+                selected_ids = st.multiselect(
+                    "Pilih item yang sudah ditangani (restock/buang/retur):",
+                    options=list(opts.keys()),
+                    format_func=lambda x: opts.get(x, x),
+                    key="restock_select"
+                )
+                catatan_restock = st.text_input(
+                    "Catatan (opsional)", placeholder="Contoh: Sudah restock dari supplier A tgl 10 Juli",
+                    key="restock_catatan"
+                )
+                if st.button("✅ Konfirmasi — Hapus dari Alert", type="primary", key="btn_restock"):
+                    for sid in selected_ids:
+                        try:
+                            rid = int(sid)
+                        except ValueError:
+                            rid = sid
+                        st.session_state.dismissed_expiry.add(rid)
+                        st.session_state.restock_log.append({
+                            "id":           rid,
+                            "nama_barang":  opts.get(sid, sid),
+                            "tgl_restock":  today.strftime("%Y-%m-%d"),
+                            "catatan":      catatan_restock or "-",
+                            "user":         st.session_state.username,
+                        })
+                    st.success(f"✅ {len(selected_ids)} item berhasil dihapus dari daftar alert!")
+                    st.rerun()
+            else:
+                st.warning("Kolom ID tidak tersedia. Fitur restock membutuhkan kolom 'id' di database.")
+
+        # ── Log Restock ────────────────────────────────────────────────────────
+        if st.session_state.restock_log:
+            with st.expander(f"📋 Riwayat Konfirmasi Restock ({len(st.session_state.restock_log)} entri)", expanded=False):
+                df_rlog = pd.DataFrame(st.session_state.restock_log)
+                st.dataframe(df_rlog, use_container_width=True, hide_index=True)
+                if st.button("🗑️ Reset Semua Restock Log (munculkan lagi semua alert)", key="btn_reset_dismiss"):
+                    st.session_state.dismissed_expiry = set()
+                    st.session_state.restock_log      = []
+                    st.rerun()
+
+    st.markdown('<div class="section-header">💰 KEUANGAN & PEMBELIAN</div>', unsafe_allow_html=True)
+
+    # ═══════════════════════════════════════════════════════════════════════════
+    # BARIS 4: KPI CARDS — KEUANGAN
+    # ═══════════════════════════════════════════════════════════════════════════
+    r3c1, r3c2, r3c3, r3c4 = st.columns(4)
+    delta_sign = "↑" if delta_bln >= 0 else "↓"
+    kpi_card(r3c1, "💸", "Total Pengeluaran",    f"Rp {total_keluar:,.0f}",    "Semua waktu",             "kpi-blue")
+    kpi_card(r3c2, "📅", "Bulan Ini",            f"Rp {total_bln_ini:,.0f}",  f"{delta_sign} Rp {abs(delta_bln):,.0f} vs bln lalu", "kpi-purple")
+    kpi_card(r3c3, "⏳", "Hutang Supplier",      f"Rp {total_hutang:,.0f}",   "Belum lunas / DP",        "kpi-red" if total_hutang > 0 else "kpi-green")
+    kpi_card(r3c4, "🧾", "Transaksi Hari Ini",   f"{trx_hari_ini} nota",      f"Total: {total_trx} semua waktu", "kpi-teal")
+
+    st.divider()
+
+    # ═══════════════════════════════════════════════════════════════════════════
+    # BARIS 5: GRAFIK PEMBELIAN + KOMPOSISI KATEGORI
+    # ═══════════════════════════════════════════════════════════════════════════
+    col_grafik1, col_grafik2 = st.columns([3, 2])
+
+    with col_grafik1:
+        st.markdown("**📊 Tren Pengeluaran Bulanan**")
+        if "bulan" in df.columns:
+            monthly = (df.groupby("bulan")[col_harga].sum()
+                       .reset_index()
+                       .rename(columns={col_harga: "Total (Rp)", "bulan": "Bulan"})
+                       .sort_values("Bulan"))
+            if len(monthly) >= 2:
+                x = np.arange(len(monthly))
+                y = monthly["Total (Rp)"].values
+                m, b = np.polyfit(x, y, 1)
+                monthly["Trend (Rp)"] = m * x + b
+                st.line_chart(monthly.set_index("Bulan")[["Total (Rp)", "Trend (Rp)"]],
+                              use_container_width=True)
+                arah = "📈 naik" if m > 0 else "📉 turun"
+                st.caption(f"Tren pengeluaran rata-rata {arah} **Rp {abs(m):,.0f}**/bulan · {len(monthly)} bulan data")
+            elif len(monthly) == 1:
+                st.bar_chart(monthly.set_index("Bulan")["Total (Rp)"], use_container_width=True)
+            else:
+                st.info("Belum cukup data untuk grafik.")
+
+    with col_grafik2:
+        st.markdown("**🗂️ Komposisi per Kategori**")
+        if "kategori" in df.columns:
+            kat_grp = (df.groupby("kategori")[col_harga].sum()
+                       .reset_index()
+                       .rename(columns={col_harga: "Total (Rp)"})
+                       .sort_values("Total (Rp)", ascending=False))
+            total_all = kat_grp["Total (Rp)"].sum()
+            for _, r in kat_grp.iterrows():
+                pct = r["Total (Rp)"] / total_all * 100 if total_all > 0 else 0
+                st.markdown(f"**{r['kategori']}**")
+                st.progress(int(pct), text=f"Rp {r['Total (Rp)']:,.0f} · {pct:.1f}%")
+
+    st.divider()
+
+    # ═══════════════════════════════════════════════════════════════════════════
+    # BARIS 6: TOP SUPPLIER + TOP 5 PRODUK
+    # ═══════════════════════════════════════════════════════════════════════════
+    col_sup, col_top5 = st.columns(2)
+
+    with col_sup:
+        st.markdown("**🏆 Top Supplier (by nilai pembelian)**")
+        if "supplier" in df.columns:
+            sup_df = (df.groupby("supplier")
+                      .agg(total=(col_harga, "sum"), frekuensi=("tanggal", "count"))
+                      .reset_index()
+                      .sort_values("total", ascending=False)
+                      .head(8))
+            sup_df.columns = ["Supplier", "Total (Rp)", "Frekuensi"]
+            sup_df["Total (Rp)"] = sup_df["Total (Rp)"].apply(lambda x: f"Rp {x:,.0f}")
+            st.dataframe(sup_df, use_container_width=True, hide_index=True)
+
+    with col_top5:
+        st.markdown("**📊 Top 5 Produk by Pengeluaran**")
+        if "nama_barang" in df.columns:
+            top5 = (df.groupby("nama_barang")[col_harga].sum()
+                    .sort_values(ascending=False).head(5)
+                    .reset_index()
+                    .rename(columns={"nama_barang": "Produk", col_harga: "Total (Rp)"}))
+            for i, (_, r) in enumerate(top5.iterrows()):
+                pct = r["Total (Rp)"] / total_keluar * 100 if total_keluar > 0 else 0
+                medal = ["🥇","🥈","🥉","4️⃣","5️⃣"][i]
+                st.markdown(f"{medal} **{r['Produk']}**  \nRp {r['Total (Rp)']:,.0f} · {pct:.1f}%")
+
+    st.divider()
+
+    # ═══════════════════════════════════════════════════════════════════════════
+    # BARIS 7: STATUS HUTANG SUPPLIER
+    # ═══════════════════════════════════════════════════════════════════════════
+    if "status_pembayaran" in df.columns and total_hutang > 0:
+        st.markdown("**⏳ Tagihan Hutang Supplier Belum Lunas**")
+        hutang_items = df[df["status_pembayaran"] != "Lunas"]
+        if not hutang_items.empty:
+            ht = (hutang_items.groupby("supplier")[col_harga].sum()
+                  .sort_values(ascending=False)
+                  .reset_index())
+            ht.columns = ["Supplier", "Total Hutang (Rp)"]
+            ht["Total Hutang (Rp)"] = ht["Total Hutang (Rp)"].apply(lambda x: f"Rp {x:,.0f}")
+            st.dataframe(ht, use_container_width=True, hide_index=True)
 
 # ─── PAGE: ADMINISTRASI ───────────────────────────────────────────────────────────
 def page_administrasi(df: pd.DataFrame):
@@ -1832,6 +2250,29 @@ def page_kontrol_audit(df: pd.DataFrame):
                     st.error(f"💀 **{len(sudah_exp)} item SUDAH KADALUARSA** — segera singkirkan!")
                     st.dataframe(sudah_exp[exp_cols].sort_values("tgl_kadaluarsa"),
                                  use_container_width=True, hide_index=True)
+                    # ── Tombol restock langsung dari tab audit ────────────────
+                    if "id" in sudah_exp.columns:
+                        with st.expander("✅ Tandai item ini sudah direstock/dibuang"):
+                            opts_exp = {
+                                str(r["id"]): f"{r.get('nama_barang','-')} | Exp: {r['tgl_kadaluarsa'].strftime('%d %b %Y')}"
+                                for _, r in sudah_exp.iterrows()
+                            }
+                            sel_exp = st.multiselect("Pilih item:", list(opts_exp.keys()),
+                                                     format_func=lambda x: opts_exp.get(x,x),
+                                                     key="audit_dismiss_exp")
+                            if st.button("✅ Konfirmasi Restock / Sudah Ditangani", key="btn_audit_dismiss"):
+                                for sid in sel_exp:
+                                    try: rid = int(sid)
+                                    except: rid = sid
+                                    st.session_state.dismissed_expiry.add(rid)
+                                    st.session_state.restock_log.append({
+                                        "id": rid, "nama_barang": opts_exp.get(sid, sid),
+                                        "tgl_restock": today.strftime("%Y-%m-%d"),
+                                        "catatan": "Ditandai dari halaman Audit",
+                                        "user": st.session_state.username,
+                                    })
+                                st.success(f"✅ {len(sel_exp)} item dihapus dari alert kadaluarsa!")
+                                st.rerun()
 
                 if not kritis.empty:
                     st.error("🚨 Barang Kritis (≤7 hari) — Segera Pakai atau Retur ke Supplier!")
@@ -2017,6 +2458,209 @@ def page_kontrol_audit(df: pd.DataFrame):
                 use_container_width=True,
             )
 
+# ─── PAGE: MANAGER PUSAT — OVERVIEW ─────────────────────────────────────────────
+def page_manager_pusat_overview(data: dict):
+    import numpy as np
+    st.title("🏢 Dashboard Manager Pusat")
+    st.caption(f"Pemantauan Lintas Cabang · {datetime.now().strftime('%d %b %Y, %H:%M')}")
+
+    ALL_CABANG = ["WKA", "Buper"]
+    today = pd.Timestamp.today().normalize()
+
+    # ── Agregasi per cabang ───────────────────────────────────────────────────
+    stats = {}
+    for cab in ALL_CABANG:
+        df = data.get(cab, pd.DataFrame()).copy()
+        if df.empty:
+            stats[cab] = {"total": 0, "hutang": 0, "trx": 0, "jenis": 0,
+                          "n_exp": 0, "n_kritis": 0, "bln_ini": 0}
+            continue
+        col_h = "harga_total" if "harga_total" in df.columns else "total_harga"
+        df[col_h] = pd.to_numeric(df[col_h], errors="coerce").fillna(0)
+        if "tanggal" in df.columns:
+            df["tanggal_dt"] = pd.to_datetime(df["tanggal"], errors="coerce")
+            df["bulan"] = df["tanggal_dt"].dt.to_period("M").astype(str)
+        bln_ini = today.to_period("M").strftime("%Y-%m")
+        n_exp = n_kritis = 0
+        if "tgl_kadaluarsa" in df.columns:
+            _mask = (df["tgl_kadaluarsa"].notna() &
+                     (df["tgl_kadaluarsa"].astype(str).str.strip().isin(["","None"]) == False))
+            df_e = df[_mask].copy()
+            if not df_e.empty:
+                df_e["tgl_kadaluarsa"] = pd.to_datetime(df_e["tgl_kadaluarsa"], errors="coerce")
+                n_exp    = len(df_e[df_e["tgl_kadaluarsa"] < today])
+                n_kritis = len(df_e[df_e["tgl_kadaluarsa"] <= today + pd.Timedelta(days=7)])
+        stats[cab] = {
+            "total":    df[col_h].sum(),
+            "hutang":   df[df["status_pembayaran"].str.contains("Tempo|DP", na=False)][col_h].sum()
+                        if "status_pembayaran" in df.columns else 0,
+            "trx":      len(df),
+            "jenis":    df["nama_barang"].nunique() if "nama_barang" in df.columns else 0,
+            "n_exp":    n_exp,
+            "n_kritis": n_kritis,
+            "bln_ini":  df[df["bulan"] == bln_ini][col_h].sum() if "bulan" in df.columns else 0,
+        }
+
+    # ── KPI Cards per Cabang ──────────────────────────────────────────────────
+    st.markdown('<div class="section-header">📊 RINGKASAN PER CABANG</div>', unsafe_allow_html=True)
+
+    for cab in ALL_CABANG:
+        s = stats[cab]
+        has_alert = s["n_kritis"] > 0 or s["n_exp"] > 0
+        alert_html = (f'<span style="background:#ef4444;color:white;border-radius:6px;'
+                      f'padding:2px 8px;font-size:0.75rem;margin-left:6px;">'
+                      f'⚠️ {s["n_kritis"]} kritis</span>') if has_alert else ""
+
+        st.markdown(f"### 🏪 Cabang {cab} {alert_html}", unsafe_allow_html=True)
+        c1, c2, c3, c4, c5 = st.columns(5)
+        kpi_card(c1, "💸", "Total Pengeluaran", f"Rp {s['total']:,.0f}", "Semua waktu", "kpi-blue")
+        kpi_card(c2, "📅", "Bulan Ini",         f"Rp {s['bln_ini']:,.0f}", today.strftime("%B %Y"), "kpi-purple")
+        kpi_card(c3, "⏳", "Hutang Supplier",   f"Rp {s['hutang']:,.0f}", "Belum lunas", "kpi-red" if s["hutang"]>0 else "kpi-green")
+        kpi_card(c4, "💀", "Exp Kritis/Lewat",  f"{s['n_kritis']+s['n_exp']} item", "Perlu tindakan", "kpi-rose" if (s["n_kritis"]+s["n_exp"])>0 else "kpi-green")
+        kpi_card(c5, "🧾", "Total Transaksi",   f"{s['trx']} nota", f"{s['jenis']} jenis produk", "kpi-teal")
+        st.markdown("---")
+
+    # ── Gabungan pengeluaran bulanan ──────────────────────────────────────────
+    st.markdown('<div class="section-header">📈 PERBANDINGAN PENGELUARAN BULANAN</div>', unsafe_allow_html=True)
+    monthly_dfs = []
+    for cab in ALL_CABANG:
+        df = data.get(cab, pd.DataFrame()).copy()
+        if df.empty: continue
+        col_h = "harga_total" if "harga_total" in df.columns else "total_harga"
+        df[col_h] = pd.to_numeric(df[col_h], errors="coerce").fillna(0)
+        if "tanggal" in df.columns:
+            df["bulan"] = pd.to_datetime(df["tanggal"], errors="coerce").dt.to_period("M").astype(str)
+        m = df.groupby("bulan")[col_h].sum().reset_index()
+        m.columns = ["Bulan", cab]
+        monthly_dfs.append(m.set_index("Bulan"))
+
+    if monthly_dfs:
+        merged = monthly_dfs[0]
+        for other in monthly_dfs[1:]:
+            merged = merged.join(other, how="outer")
+        merged = merged.fillna(0).sort_index()
+        st.line_chart(merged, use_container_width=True)
+        st.caption("Perbandingan total pengeluaran per cabang per bulan")
+
+    # ── Alert Kritis Lintas Cabang ────────────────────────────────────────────
+    for cab in ALL_CABANG:
+        df = data.get(cab, pd.DataFrame()).copy()
+        if df.empty or "tgl_kadaluarsa" not in df.columns: continue
+        _mask = (df["tgl_kadaluarsa"].notna() &
+                 (df["tgl_kadaluarsa"].astype(str).str.strip().isin(["","None"]) == False))
+        df_e = df[_mask].copy()
+        if df_e.empty: continue
+        df_e["tgl_kadaluarsa"] = pd.to_datetime(df_e["tgl_kadaluarsa"], errors="coerce")
+        kritis = df_e[df_e["tgl_kadaluarsa"] <= today + pd.Timedelta(days=7)]
+        if not kritis.empty:
+            st.error(f"🚨 **Cabang {cab}**: {len(kritis)} item kritis! Minta Manager Cabang segera tindak lanjut.")
+            exp_cols = [c for c in ["nama_barang","merk","tgl_kadaluarsa","supplier","catatan"] if c in kritis.columns]
+            st.dataframe(kritis[exp_cols].sort_values("tgl_kadaluarsa"), use_container_width=True, hide_index=True)
+
+
+# ─── PAGE: MANAGER PUSAT — PERBANDINGAN CABANG ───────────────────────────────────
+def page_perbandingan_cabang(data: dict):
+    import numpy as np
+    st.title("📈 Perbandingan Performa Cabang")
+    st.caption(f"WKA vs Buper · {datetime.now().strftime('%d %b %Y, %H:%M')}")
+
+    ALL_CABANG = ["WKA", "Buper"]
+    today = pd.Timestamp.today().normalize()
+
+    # ── Tabel ringkasan ───────────────────────────────────────────────────────
+    rows = []
+    for cab in ALL_CABANG:
+        df = data.get(cab, pd.DataFrame()).copy()
+        if df.empty:
+            rows.append({"Cabang": cab, "Total Pengeluaran": 0, "Jumlah Transaksi": 0,
+                         "Rata-rata/Trx": 0, "Hutang": 0, "Jenis Produk": 0, "Alert Kadaluarsa": 0})
+            continue
+        col_h = "harga_total" if "harga_total" in df.columns else "total_harga"
+        df[col_h] = pd.to_numeric(df[col_h], errors="coerce").fillna(0)
+        hutang = df[df["status_pembayaran"].str.contains("Tempo|DP", na=False)][col_h].sum() if "status_pembayaran" in df.columns else 0
+        n_alert = 0
+        if "tgl_kadaluarsa" in df.columns:
+            _mask = (df["tgl_kadaluarsa"].notna() &
+                     (df["tgl_kadaluarsa"].astype(str).str.strip().isin(["","None"]) == False))
+            df_e = df[_mask].copy()
+            if not df_e.empty:
+                df_e["tgl_kadaluarsa"] = pd.to_datetime(df_e["tgl_kadaluarsa"], errors="coerce")
+                n_alert = len(df_e[df_e["tgl_kadaluarsa"] <= today + pd.Timedelta(days=30)])
+        rows.append({
+            "Cabang": cab,
+            "Total Pengeluaran": df[col_h].sum(),
+            "Jumlah Transaksi":  len(df),
+            "Rata-rata/Trx":     df[col_h].mean() if len(df) > 0 else 0,
+            "Hutang":            hutang,
+            "Jenis Produk":      df["nama_barang"].nunique() if "nama_barang" in df.columns else 0,
+            "Alert Kadaluarsa":  n_alert,
+        })
+
+    df_comp = pd.DataFrame(rows)
+    fmt_cols = ["Total Pengeluaran", "Hutang", "Rata-rata/Trx"]
+    for c in fmt_cols:
+        df_comp[c] = df_comp[c].apply(lambda x: f"Rp {x:,.0f}")
+    st.dataframe(df_comp, use_container_width=True, hide_index=True)
+
+    st.divider()
+
+    # ── Analisis kategori per cabang ──────────────────────────────────────────
+    st.markdown("**🗂️ Komposisi Pengeluaran per Kategori**")
+    c_left, c_right = st.columns(2)
+    for cab, col in zip(ALL_CABANG, [c_left, c_right]):
+        df = data.get(cab, pd.DataFrame()).copy()
+        col.markdown(f"**Cabang {cab}**")
+        if df.empty or "kategori" not in df.columns:
+            col.info("Belum ada data.")
+            continue
+        col_h = "harga_total" if "harga_total" in df.columns else "total_harga"
+        df[col_h] = pd.to_numeric(df[col_h], errors="coerce").fillna(0)
+        kat_g = df.groupby("kategori")[col_h].sum().sort_values(ascending=False)
+        total = kat_g.sum()
+        for kat, val in kat_g.items():
+            pct = val / total * 100 if total > 0 else 0
+            col.progress(int(pct), text=f"{kat}: Rp {val:,.0f} · {pct:.1f}%")
+
+    st.divider()
+
+    # ── Supplier overlap ──────────────────────────────────────────────────────
+    st.markdown("**🏪 Supplier yang Digunakan Tiap Cabang**")
+    sup_sets = {}
+    for cab in ALL_CABANG:
+        df = data.get(cab, pd.DataFrame())
+        sup_sets[cab] = set(df["supplier"].dropna().unique()) if "supplier" in df.columns else set()
+    shared = sup_sets.get("WKA", set()) & sup_sets.get("Buper", set())
+    only_wka   = sup_sets.get("WKA", set())   - sup_sets.get("Buper", set())
+    only_buper = sup_sets.get("Buper", set()) - sup_sets.get("WKA", set())
+    ss1, ss2, ss3 = st.columns(3)
+    ss1.markdown(f"**WKA saja ({len(only_wka)}):**")
+    for s in sorted(only_wka): ss1.markdown(f"· {s}")
+    ss2.markdown(f"**Bersama ({len(shared)}):**")
+    for s in sorted(shared): ss2.markdown(f"✅ {s}")
+    ss3.markdown(f"**Buper saja ({len(only_buper)}):**")
+    for s in sorted(only_buper): ss3.markdown(f"· {s}")
+
+    # ── Export lintas cabang ──────────────────────────────────────────────────
+    st.divider()
+    st.markdown("**⬇️ Export Gabungan Data Kedua Cabang**")
+    all_dfs = []
+    for cab in ALL_CABANG:
+        df = data.get(cab, pd.DataFrame()).copy()
+        if not df.empty:
+            df["cabang"] = cab
+            all_dfs.append(df)
+    if all_dfs:
+        combined = pd.concat(all_dfs, ignore_index=True)
+        csv_combined = combined.to_csv(index=False).encode("utf-8")
+        st.download_button(
+            "⬇️ Download CSV Gabungan (WKA + Buper)",
+            data=csv_combined,
+            file_name=f"gabungan_WKA_Buper_{date.today()}.csv",
+            mime="text/csv",
+            use_container_width=True,
+        )
+
+
 # ─── MAIN ────────────────────────────────────────────────────────────────────────
 def main():
     if not st.session_state.logged_in:
@@ -2024,8 +2668,23 @@ def main():
         return
 
     page = show_sidebar()
-    df   = get_data(st.session_state.cabang)
+    role = st.session_state.role
 
+    # ── Route: Manager Pusat ──────────────────────────────────────────────────
+    if role == "manager_pusat":
+        all_data = get_data_all_cabang()
+        if page == "🏢 Pusat — Overview":
+            page_manager_pusat_overview(all_data)
+        elif page == "📊 Dashboard WKA":
+            page_dashboard(all_data.get("WKA", pd.DataFrame()), cabang_label="WKA")
+        elif page == "📊 Dashboard Buper":
+            page_dashboard(all_data.get("Buper", pd.DataFrame()), cabang_label="Buper")
+        elif page == "📈 Perbandingan Cabang":
+            page_perbandingan_cabang(all_data)
+        return
+
+    # ── Route: Kasir / Manager Cabang ─────────────────────────────────────────
+    df = get_data(st.session_state.cabang)
     if   page == "📊 Dashboard":        page_dashboard(df)
     elif page == "📋 Administrasi":     page_administrasi(df)
     elif page == "🔍 Kontrol & Audit":  page_kontrol_audit(df)
