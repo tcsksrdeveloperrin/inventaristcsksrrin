@@ -2454,8 +2454,9 @@ def page_administrasi(df: pd.DataFrame):
                     f"{row.get('supplier','-')} · {row.get('tanggal','-')}")
 
         # ── EDIT ──────────────────────────────────────────────────────────────
-        with st.expander("✏️ Edit Transaksi Ini", expanded=False):
+        with st.expander("Edit Transaksi Ini", expanded=False):
             with st.form(f"form_edit_{id_pilih}"):
+                # Baris 1: Tanggal, Nota, Supplier
                 ea, eb, ec = st.columns(3)
                 with ea:
                     e_tgl  = st.date_input("Tanggal",
@@ -2472,7 +2473,8 @@ def page_administrasi(df: pd.DataFrame):
                     e_sub = st.selectbox("Sub Kategori", sub_l,
                         index=sub_l.index(sub_n) if sub_n in sub_l else 0)
 
-                ed, ee, ef = st.columns(3)
+                # Baris 2: Nama Barang, Merk
+                ed, ee = st.columns(2)
                 with ed:
                     nama_opts = NAMA_BARANG_MAP.get((e_kat, e_sub), ["Lainnya"])
                     cur_nama  = row.get("nama_barang", "")
@@ -2480,7 +2482,7 @@ def page_administrasi(df: pd.DataFrame):
                     e_nama_sel = st.selectbox("Nama Barang", nama_opts, index=nama_idx,
                                               key=f"e_nama_{id_pilih}")
                     if e_nama_sel == "Lainnya":
-                        e_nama = st.text_input("Ketik Nama Barang Baru",
+                        e_nama = st.text_input("Ketik Nama Barang",
                             value=cur_nama if cur_nama not in nama_opts else "",
                             key=f"e_nama_c_{id_pilih}")
                     else:
@@ -2503,33 +2505,59 @@ def page_administrasi(df: pd.DataFrame):
                         e_merk = st.text_input("Merk / Brand", value=cur_merk,
                                                key=f"e_merk_f_{id_pilih}")
 
-                with ef:
-                    e_qty  = st.number_input("Qty", value=float(row.get("qty", 0)),
-                                             min_value=0.0, step=0.5)
-                    uom_n  = row.get("uom", UOM_OPTIONS[0])
-                    e_uom  = st.selectbox("UoM", UOM_OPTIONS,
-                        index=UOM_OPTIONS.index(uom_n) if uom_n in UOM_OPTIONS else 0)
+                # Baris 3: Qty, UoM Qty, Vol/Unit, UoM Vol
+                ef1, ef2, ef3, ef4 = st.columns(4)
+                with ef1:
+                    e_qty = st.number_input("Qty", value=float(row.get("qty", 0)),
+                                            min_value=0.0, step=0.5)
+                with ef2:
+                    cur_uom_qty = str(row.get("uom_qty") or UOM_QTY_OPTIONS[0])
+                    uom_qty_idx = UOM_QTY_OPTIONS.index(cur_uom_qty)                                   if cur_uom_qty in UOM_QTY_OPTIONS else 0
+                    e_uom_qty   = st.selectbox("Satuan Qty", UOM_QTY_OPTIONS,
+                                               index=uom_qty_idx,
+                                               key=f"e_uom_qty_{id_pilih}")
+                with ef3:
+                    cur_vol = row.get("vol_per_unit")
+                    e_vol   = st.number_input("Vol/Unit",
+                                              value=float(cur_vol) if cur_vol else 0.0,
+                                              min_value=0.0, step=0.001, format="%.3f")
+                with ef4:
+                    cur_uom_vol = str(row.get("uom_vol") or VOL_OPTIONS[0])
+                    vol_idx     = VOL_OPTIONS.index(cur_uom_vol)                                   if cur_uom_vol in VOL_OPTIONS else 0
+                    e_uom_vol   = st.selectbox("Satuan Vol", VOL_OPTIONS,
+                                               index=vol_idx,
+                                               key=f"e_uom_vol_{id_pilih}")
 
+                # Baris 4: Harga Total, Status
                 eg, eh = st.columns(2)
                 with eg:
-                    e_hrg = st.number_input("Harga Satuan (Rp)",
-                        value=int(row.get("harga_satuan", 0)), min_value=0, step=500)
+                    # harga_total adalah kolom utama; total_harga adalah generated column
+                    cur_hrg = row.get("harga_total") or row.get("total_harga") or 0
+                    e_hrg   = st.number_input("Harga Total (Rp)",
+                                              value=int(cur_hrg), min_value=0, step=500)
                 with eh:
                     st_n  = row.get("status_pembayaran", STATUS_OPTIONS[0])
                     e_st  = st.selectbox("Status Pembayaran", STATUS_OPTIONS,
                         index=STATUS_OPTIONS.index(st_n) if st_n in STATUS_OPTIONS else 0)
 
+                # Baris 5: Kadaluarsa, Catatan
                 exp_raw = row.get("tgl_kadaluarsa")
-                exp_v   = pd.to_datetime(exp_raw).date() \
-                          if exp_raw and str(exp_raw) not in ("None", "") else None
+                exp_v   = pd.to_datetime(exp_raw).date()                           if exp_raw and str(exp_raw) not in ("None", "", "NaT") else None
                 e_exp   = st.date_input("Tanggal Kadaluarsa", value=exp_v)
-                e_cat   = st.text_area("Catatan", value=str(row.get("catatan") or ""), height=70)
+                e_cat   = st.text_area("Catatan",
+                                       value=str(row.get("catatan") or ""), height=70)
 
-                e_total = e_qty * e_hrg
-                st.info(f"Total Harga: **Rp {e_total:,.0f}**")
+                # Hitung netto total estimasi
+                if e_qty > 0 and e_vol > 0:
+                    faktor      = VOL_FAKTOR.get(e_uom_vol, 1)
+                    netto_total = round(e_qty * e_vol * faktor, 3)
+                    satuan_dasar = "ml" if e_uom_vol in ("ml", "liter") else "gram"
+                    st.caption(f"Netto total estimasi: {netto_total:,.3f} {satuan_dasar}")
+                else:
+                    netto_total = None
 
-                if st.form_submit_button("Simpan", type="primary"):
-                    ok = update_row(id_pilih, {
+                if st.form_submit_button("Simpan Perubahan", type="primary"):
+                    payload = {
                         "tanggal":           e_tgl.isoformat(),
                         "no_nota":           e_nota or None,
                         "supplier":          e_sup,
@@ -2538,17 +2566,19 @@ def page_administrasi(df: pd.DataFrame):
                         "nama_barang":       e_nama,
                         "merk":              e_merk or "-",
                         "qty":               float(e_qty),
-                        "uom":               e_uom,
-                        "harga_satuan":      int(e_hrg),
-                        "total_harga":       int(e_total),
+                        "uom_qty":           e_uom_qty,
+                        "vol_per_unit":      float(e_vol) if e_vol > 0 else None,
+                        "uom_vol":           e_uom_vol if e_vol > 0 else None,
+                        "netto_total":       netto_total,
+                        "harga_total":       int(e_hrg),
                         "tgl_kadaluarsa":    e_exp.isoformat() if e_exp else None,
                         "status_pembayaran": e_st,
                         "catatan":           e_cat or None,
-                    })
+                    }
+                    ok = update_row(id_pilih, payload)
                     if ok:
-                        st.success("Data berhasil diperbarui!")
+                        st.success("Data berhasil diperbarui.")
                         st.rerun()
-
         # ── HAPUS ─────────────────────────────────────────────────────────────
         with st.expander("🗑️ Hapus Transaksi Ini", expanded=False):
             st.warning(
