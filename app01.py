@@ -65,60 +65,101 @@ st.markdown("""
 
     /* ─── Metric containers (Streamlit default) ─── */
     div[data-testid="metric-container"] {
-        background: #ffffff;
-        border-radius: 8px;
+        background: #fafafa;
+        border-radius: 10px;
         padding: 1rem 1.1rem;
-        border: 1px solid #e2e8f0;
+        border: 1px solid #e0e7ff;
         border-top: 3px solid #4f46e5;
-        box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+    }
+    div[data-testid="metric-container"] label {
+        font-size: 0.7rem !important;
+        font-weight: 700 !important;
+        text-transform: uppercase !important;
+        letter-spacing: 0.08em !important;
+        color: #94a3b8 !important;
+    }
+    div[data-testid="metric-container"] [data-testid="stMetricValue"] {
+        font-size: 1.35rem !important;
+        font-weight: 800 !important;
+        color: #1e293b !important;
+        letter-spacing: -0.02em !important;
     }
 
-    /* ─── KPI Flashcard ─── */
+    /* ─── KPI Flashcard — monokrom indigo modern ─── */
     .kpi-card {
         background: #ffffff;
-        border: 1px solid #e2e8f0;
-        border-radius: 8px;
-        padding: 1.1rem 1.25rem 1rem;
-        margin-bottom: 0.5rem;
-        box-shadow: 0 1px 4px rgba(0,0,0,0.04);
+        border: 1px solid #e0e7ff;
+        border-radius: 10px;
+        padding: 1.05rem 1.2rem 0.95rem 1.4rem;
+        margin-bottom: 0.4rem;
         position: relative;
+        overflow: hidden;
+        transition: box-shadow 0.15s;
     }
+    .kpi-card:hover { box-shadow: 0 4px 12px rgba(79,70,229,0.10); }
+
+    /* Strip kiri 4px */
     .kpi-card .kpi-accent {
         position: absolute;
         top: 0; left: 0;
-        width: 3px; height: 100%;
-        border-radius: 8px 0 0 8px;
-    }
-    .kpi-card .kpi-label {
-        font-size: 0.68rem;
-        font-weight: 700;
-        text-transform: uppercase;
-        letter-spacing: 0.08em;
-        color: #64748b;
-        margin-bottom: 0.3rem;
-    }
-    .kpi-card .kpi-value {
-        font-size: 1.4rem;
-        font-weight: 800;
-        color: #0f172a;
-        line-height: 1.2;
-    }
-    .kpi-card .kpi-sub {
-        font-size: 0.75rem;
-        color: #64748b;
-        margin-top: 0.25rem;
+        width: 4px; height: 100%;
+        border-radius: 10px 0 0 10px;
     }
 
-    /* Accent color variants — hanya warna strip kiri */
+    .kpi-card .kpi-label {
+        font-size: 0.66rem;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.1em;
+        color: #94a3b8;
+        margin-bottom: 0.25rem;
+        line-height: 1.3;
+    }
+    .kpi-card .kpi-value {
+        font-size: 1.45rem;
+        font-weight: 800;
+        color: #1e293b;
+        line-height: 1.15;
+        letter-spacing: -0.02em;
+    }
+    .kpi-card .kpi-sub {
+        font-size: 0.72rem;
+        color: #94a3b8;
+        margin-top: 0.2rem;
+        line-height: 1.4;
+    }
+
+    /* Strip variants — semua dari palet indigo/slate */
     .kpi-primary  .kpi-accent { background: #4f46e5; }
+    .kpi-primary  .kpi-value  { color: #1e293b; }
+
+    .kpi-indigo   .kpi-accent { background: #6366f1; }
+    .kpi-indigo   .kpi-value  { color: #1e293b; }
+
+    .kpi-slate    .kpi-accent { background: #475569; }
+    .kpi-slate    .kpi-value  { color: #1e293b; }
+
     .kpi-success  .kpi-accent { background: #16a34a; }
+    .kpi-success  .kpi-value  { color: #15803d; }
+
     .kpi-warning  .kpi-accent { background: #d97706; }
+    .kpi-warning  .kpi-value  { color: #b45309; }
+
     .kpi-danger   .kpi-accent { background: #dc2626; }
-    .kpi-neutral  .kpi-accent { background: #94a3b8; }
-    /* Value color hint jika critical */
-    .kpi-danger  .kpi-value { color: #dc2626; }
-    .kpi-warning .kpi-value { color: #b45309; }
-    .kpi-success .kpi-value { color: #15803d; }
+    .kpi-danger   .kpi-value  { color: #dc2626; }
+
+    .kpi-neutral  .kpi-accent { background: #cbd5e1; }
+    .kpi-neutral  .kpi-value  { color: #475569; }
+
+    /* Varian filled — dipakai untuk kartu ringkasan di tab Stok & Harga */
+    .kpi-filled {
+        background: #eef2ff;
+        border-color: #c7d2fe;
+    }
+    .kpi-filled .kpi-label  { color: #6366f1; }
+    .kpi-filled .kpi-value  { color: #312e81; }
+    .kpi-filled .kpi-sub    { color: #818cf8; }
+    .kpi-filled .kpi-accent { background: #4f46e5; }
 
     /* ─── Section header ─── */
     .section-header {
@@ -1630,8 +1671,11 @@ def page_dashboard(df: pd.DataFrame, cabang_label: str = None):
                 m_slope, b_int = np.polyfit(x, y, 1)
                 monthly["Tren Linear"] = m_slope * x + b_int
                 proj = max(monthly["Total (Rp)"].iloc[-1] + m_slope, 0)
-                st.line_chart(monthly.set_index("Bulan")[["Total (Rp)", "Tren Linear"]],
-                              use_container_width=True)
+                st.line_chart(
+                    monthly.set_index("Bulan")[["Total (Rp)", "Tren Linear"]],
+                    use_container_width=True,
+                    color=["#4f46e5", "#c7d2fe"],
+                )
                 arah = "📈 naik" if m_slope > 0 else "📉 turun"
                 st.caption(
                     f"Tren {arah} Rp {abs(m_slope):,.0f}/bulan  |  {len(monthly)} bulan data  |  Proyeksi bulan depan: Rp {proj:,.0f}")
@@ -1685,8 +1729,11 @@ def page_dashboard(df: pd.DataFrame, cabang_label: str = None):
 
             if len(tren_df) >= 3:
                 tren_df["MA3"] = tren_df["Harga/Unit"].rolling(3, min_periods=1).mean()
-                st.line_chart(tren_df[["Harga/Unit", "MA3"]],
-                              use_container_width=True)
+                st.line_chart(
+                    tren_df[["Harga/Unit", "MA3"]],
+                    use_container_width=True,
+                    color=["#4f46e5", "#c7d2fe"],
+                )
                 mu  = tren_df["Harga/Unit"].mean()
                 std = tren_df["Harga/Unit"].std()
                 cv  = std / mu * 100 if mu > 0 else 0
@@ -2633,10 +2680,16 @@ def page_kontrol_audit(df: pd.DataFrame):
         rasio_lunas  = total_lunas / total_all * 100 if total_all > 0 else 0
 
         k1, k2, k3, k4 = st.columns(4)
-        k1.metric("Total Keluar",       f"Rp {total_all:,.0f}")
-        k2.metric("Sudah Lunas",         f"Rp {total_lunas:,.0f}")
-        k3.metric("Belum Lunas",         f"Rp {total_hutang:,.0f}", delta_color="inverse")
-        k4.metric("Rasio Lunas",         f"{rasio_lunas:.1f}%")
+        kpi_card(k1, "Total Pengeluaran",  f"Rp {total_all:,.0f}",
+                 "Semua transaksi", "kpi-filled")
+        kpi_card(k2, "Sudah Lunas",        f"Rp {total_lunas:,.0f}",
+                 f"{rasio_lunas:.1f}% dari total", "kpi-success")
+        kpi_card(k3, "Belum Lunas",        f"Rp {total_hutang:,.0f}",
+                 "Tempo / DP — perlu dilunasi",
+                 "kpi-warning" if total_hutang > 0 else "kpi-success")
+        kpi_card(k4, "Rasio Lunas",        f"{rasio_lunas:.1f}%",
+                 "Persentase transaksi lunas",
+                 "kpi-success" if rasio_lunas >= 90 else "kpi-warning")
 
         st.divider()
         col_h1, col_h2 = st.columns(2)
@@ -2683,11 +2736,22 @@ def page_kontrol_audit(df: pd.DataFrame):
     with tab_stok:
         st.subheader("Ringkasan Stok & Analisis Harga")
 
+        _total_spend  = df[col_harga].sum()
+        _avg_trx      = df[col_harga].mean() if len(df) > 0 else 0
+        _max_trx      = df[col_harga].max()  if len(df) > 0 else 0
+        _jenis_barang = df["nama_barang"].nunique() if "nama_barang" in df.columns else 0
+        _total_qty    = int(df["qty"].sum()) if "qty" in df.columns else 0
+        _jml_trx      = len(df)
+
         s1, s2, s3, s4 = st.columns(4)
-        s1.metric("Total Pengeluaran",     f"Rp {df[col_harga].sum():,.0f}")
-        s2.metric("Rata-rata per Transaksi",f"Rp {df[col_harga].mean():,.0f}")
-        s3.metric("Transaksi Terbesar",     f"Rp {df[col_harga].max():,.0f}")
-        s4.metric("Jenis Barang Unik",     df["nama_barang"].nunique() if "nama_barang" in df.columns else 0)
+        kpi_card(s1, "Total Pengeluaran",      f"Rp {_total_spend:,.0f}",
+                 f"{_jml_trx} transaksi tercatat", "kpi-filled")
+        kpi_card(s2, "Rata-rata per Transaksi", f"Rp {_avg_trx:,.0f}",
+                 "Nilai rata-rata per nota", "kpi-primary")
+        kpi_card(s3, "Transaksi Terbesar",      f"Rp {_max_trx:,.0f}",
+                 "Nilai tertinggi dalam satu nota", "kpi-slate")
+        kpi_card(s4, "Jenis Barang Unik",       f"{_jenis_barang} SKU",
+                 f"Total qty: {_total_qty:,} unit", "kpi-neutral")
 
         st.divider()
         col_s1, col_s2 = st.columns(2)
@@ -2719,10 +2783,18 @@ def page_kontrol_audit(df: pd.DataFrame):
 
                 if len(tren) >= 2:
                     tren["MA3"] = tren["harga_pu"].rolling(3, min_periods=1).mean()
-                    st.line_chart(tren[["harga_pu","MA3"]], use_container_width=True)
+                    st.line_chart(
+                        tren[["harga_pu","MA3"]],
+                        use_container_width=True,
+                        color=["#4f46e5", "#c7d2fe"],
+                    )
                     mu = tren["harga_pu"].mean(); std = tren["harga_pu"].std()
                     cv = std / mu * 100 if mu > 0 else 0
-                    st.caption(f"Rata-rata: {mu:,.0f}  |  Std dev: {std:,.0f}  |  CV: {cv:.1f}%")
+                    stab = "stabil" if cv < 10 else "fluktuatif"
+                    st.caption(
+                        f"Rata-rata: Rp {mu:,.0f}  |  Std dev: Rp {std:,.0f}  "
+                        f"|  CV: {cv:.1f}% ({stab})"
+                    )
                 elif len(tren) == 1:
                     st.info("Butuh ≥2 transaksi untuk grafik tren.")
                 else:
@@ -2736,7 +2808,11 @@ def page_kontrol_audit(df: pd.DataFrame):
                        .sort_values("bulan"))
             monthly.columns = ["Bulan", "Total (Rp)"]
             if not monthly.empty:
-                st.bar_chart(monthly.set_index("Bulan"), use_container_width=True)
+                st.bar_chart(
+                    monthly.set_index("Bulan"),
+                    use_container_width=True,
+                    color="#4f46e5",
+                )
 
     # ══════════════════════════════════════════════════════════════════════════
     # TAB 4 — AUDIT LOG
@@ -2872,7 +2948,11 @@ def page_manager_pusat_overview(data: dict):
         for other in monthly_dfs[1:]:
             merged = merged.join(other, how="outer")
         merged = merged.fillna(0).sort_index()
-        st.line_chart(merged, use_container_width=True)
+        st.line_chart(
+            merged,
+            use_container_width=True,
+            color=["#4f46e5", "#6366f1"],
+        )
         st.caption("Perbandingan total pengeluaran per cabang per bulan")
 
     # ── Alert Kritis Lintas Cabang ────────────────────────────────────────────
