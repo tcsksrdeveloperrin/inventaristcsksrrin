@@ -36,20 +36,54 @@ st.markdown("""
 
     /* ─── Sidebar ─── */
     [data-testid="stSidebar"] {
-        background: #1e1b4b;
+        background: #1e1b4b;          /* indigo-950 — gelap kuat */
         border-right: 1px solid #312e81;
     }
     [data-testid="stSidebar"] * { color: #e0e7ff !important; }
-    [data-testid="stSidebar"] .stRadio > div { gap: 2px; }
+
+    /* Nav header area */
+    [data-testid="stSidebar"] [data-testid="stVerticalBlock"] > div:first-child {
+        border-bottom: 1px solid rgba(99,102,241,0.25);
+    }
+
+    /* Radio nav items */
+    [data-testid="stSidebar"] .stRadio > div { gap: 3px; }
     [data-testid="stSidebar"] .stRadio label {
-        background: rgba(255,255,255,0.05);
+        background: transparent;
         border-radius: 6px;
-        padding: 7px 12px !important;
-        transition: background 0.15s;
+        padding: 8px 14px !important;
+        transition: background 0.15s, color 0.15s;
         font-size: 0.875rem;
+        font-weight: 500;
+        color: #a5b4fc !important;
+        border: 1px solid transparent;
     }
     [data-testid="stSidebar"] .stRadio label:hover {
-        background: rgba(79,70,229,0.25);
+        background: rgba(99,102,241,0.15);
+        color: #e0e7ff !important;
+        border-color: rgba(99,102,241,0.25);
+    }
+    /* Selected state */
+    [data-testid="stSidebar"] .stRadio label[data-baseweb="radio"]:has(input:checked) {
+        background: rgba(99,102,241,0.2);
+        color: #ffffff !important;
+        border-color: rgba(99,102,241,0.4);
+    }
+
+    /* Sidebar button (Keluar) */
+    [data-testid="stSidebar"] .stButton > button {
+        background: transparent !important;
+        color: #94a3b8 !important;
+        border: 1px solid rgba(255,255,255,0.1) !important;
+        border-radius: 6px;
+        font-size: 0.8rem;
+        font-weight: 500;
+        transition: all 0.15s;
+    }
+    [data-testid="stSidebar"] .stButton > button:hover {
+        background: rgba(239,68,68,0.15) !important;
+        border-color: rgba(239,68,68,0.3) !important;
+        color: #fca5a5 !important;
     }
 
     /* ─── Metric containers (Streamlit default) ─── */
@@ -916,29 +950,261 @@ def login_check(username: str, password: str):
 
 # ─── LOGIN ───────────────────────────────────────────────────────────────────────
 def show_login():
-    _, col, _ = st.columns([1, 1.4, 1])
-    with col:
-        st.markdown("<br><br>", unsafe_allow_html=True)
-        st.markdown("""
-        <div style='text-align:center;padding:2.2rem;
-                    background:linear-gradient(135deg,#1a1a2e,#0f3460);
-                    border-radius:20px;color:white;margin-bottom:2rem;'>
-            <div style='font-size:1.5rem;font-weight:800;letter-spacing:-0.02em;color:#4f46e5;'>INVENTARIS</div>
-            <h2 style='margin:0.4rem 0 0.2rem;font-size:1.4rem;font-weight:800;letter-spacing:-0.01em;'>Inventaris Kafe</h2>
-            <p style='opacity:0.65;margin:0;font-size:0.9rem;'>
-                Sistem Pencatatan Bahan Baku & Packaging
-            </p>
+    # Full-page login CSS — injected only on login screen
+    st.markdown("""
+    <style>
+    /* Hide Streamlit chrome on login page */
+    [data-testid="stSidebar"]          { display: none !important; }
+    [data-testid="stToolbar"]          { display: none !important; }
+    header[data-testid="stHeader"]     { display: none !important; }
+    footer                             { display: none !important; }
+    .stApp                             { background: #f5f3ff; }
+
+    /* ── Split-screen wrapper ── */
+    .login-shell {
+        display: flex;
+        min-height: 100vh;
+        width: 100%;
+        font-family: 'Inter', system-ui, -apple-system, sans-serif;
+    }
+
+    /* ── Left panel: brand / illustration ── */
+    .login-left {
+        flex: 1;
+        background: linear-gradient(155deg, #4f46e5 0%, #3730a3 55%, #1e1b4b 100%);
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        align-items: flex-start;
+        padding: 4rem 3.5rem;
+        position: relative;
+        overflow: hidden;
+    }
+    .login-left::before {
+        content: '';
+        position: absolute;
+        top: -120px; right: -120px;
+        width: 420px; height: 420px;
+        border-radius: 50%;
+        background: rgba(255,255,255,0.04);
+        pointer-events: none;
+    }
+    .login-left::after {
+        content: '';
+        position: absolute;
+        bottom: -80px; left: -60px;
+        width: 300px; height: 300px;
+        border-radius: 50%;
+        background: rgba(255,255,255,0.04);
+        pointer-events: none;
+    }
+    .login-brand-tag {
+        display: inline-block;
+        background: rgba(255,255,255,0.12);
+        color: #c7d2fe;
+        font-size: 0.72rem;
+        font-weight: 700;
+        letter-spacing: 0.14em;
+        text-transform: uppercase;
+        padding: 5px 14px;
+        border-radius: 999px;
+        margin-bottom: 1.8rem;
+        border: 1px solid rgba(255,255,255,0.15);
+    }
+    .login-brand-name {
+        font-size: 2.4rem;
+        font-weight: 800;
+        color: #ffffff;
+        line-height: 1.15;
+        letter-spacing: -0.02em;
+        margin-bottom: 1rem;
+    }
+    .login-brand-name span { color: #a5b4fc; }
+    .login-brand-desc {
+        font-size: 0.95rem;
+        color: #c7d2fe;
+        line-height: 1.65;
+        max-width: 340px;
+        margin-bottom: 2.5rem;
+    }
+    .login-features {
+        display: flex;
+        flex-direction: column;
+        gap: 0.7rem;
+    }
+    .login-feature-item {
+        display: flex;
+        align-items: center;
+        gap: 0.7rem;
+        color: #e0e7ff;
+        font-size: 0.875rem;
+    }
+    .login-feature-dot {
+        width: 7px; height: 7px;
+        border-radius: 50%;
+        background: #818cf8;
+        flex-shrink: 0;
+    }
+    .login-cabang-badges {
+        display: flex;
+        gap: 0.5rem;
+        margin-top: 2rem;
+        flex-wrap: wrap;
+    }
+    .login-badge {
+        background: rgba(255,255,255,0.1);
+        border: 1px solid rgba(255,255,255,0.18);
+        color: #e0e7ff;
+        padding: 4px 12px;
+        border-radius: 999px;
+        font-size: 0.75rem;
+        font-weight: 600;
+    }
+
+    /* ── Right panel: form ── */
+    .login-right {
+        width: 440px;
+        min-width: 380px;
+        background: #ffffff;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        padding: 3.5rem 3rem;
+        box-shadow: -4px 0 40px rgba(79,70,229,0.08);
+    }
+    .login-form-header {
+        margin-bottom: 2rem;
+    }
+    .login-form-title {
+        font-size: 1.5rem;
+        font-weight: 800;
+        color: #0f172a;
+        letter-spacing: -0.02em;
+        margin-bottom: 0.3rem;
+    }
+    .login-form-sub {
+        font-size: 0.875rem;
+        color: #64748b;
+    }
+    .login-divider {
+        height: 1px;
+        background: #f1f5f9;
+        margin: 1.5rem 0;
+    }
+    .demo-table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 0.78rem;
+    }
+    .demo-table th {
+        text-align: left;
+        color: #94a3b8;
+        font-weight: 600;
+        font-size: 0.68rem;
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+        padding: 0 0 0.4rem;
+    }
+    .demo-table td {
+        padding: 4px 0;
+        color: #334155;
+        vertical-align: middle;
+    }
+    .demo-table td code {
+        background: #f1f5f9;
+        border: 1px solid #e2e8f0;
+        border-radius: 4px;
+        padding: 1px 6px;
+        font-size: 0.8rem;
+        color: #4f46e5;
+        font-family: 'Fira Mono', monospace;
+    }
+    .demo-role-badge {
+        display: inline-block;
+        padding: 1px 8px;
+        border-radius: 4px;
+        font-size: 0.7rem;
+        font-weight: 600;
+    }
+    .badge-kasir   { background: #eff6ff; color: #1d4ed8; }
+    .badge-manager { background: #f0fdf4; color: #15803d; }
+    .badge-pusat   { background: #f5f3ff; color: #4f46e5; }
+    </style>
+
+    <div class="login-shell">
+      <!-- Left brand panel -->
+      <div class="login-left">
+        <span class="login-brand-tag">Inventaris Kafe</span>
+        <div class="login-brand-name">Kelola Stok<br><span>Lebih Cerdas.</span></div>
+        <p class="login-brand-desc">
+          Sistem pencatatan bahan baku, minuman, dan packaging berbasis peran
+          — dilengkapi monitor kadaluarsa, analisis supplier, dan laporan keuangan
+          pembelian secara real-time.
+        </p>
+        <div class="login-features">
+          <div class="login-feature-item">
+            <span class="login-feature-dot"></span>
+            Pencatatan multi-item per nota dengan foto invoice
+          </div>
+          <div class="login-feature-item">
+            <span class="login-feature-dot"></span>
+            Alert kadaluarsa otomatis dengan konfirmasi restock
+          </div>
+          <div class="login-feature-item">
+            <span class="login-feature-dot"></span>
+            Analisis harga, volatilitas, dan aging hutang supplier
+          </div>
+          <div class="login-feature-item">
+            <span class="login-feature-dot"></span>
+            Dashboard Manager Pusat lintas cabang WKA &amp; Buper
+          </div>
         </div>
-        """, unsafe_allow_html=True)
+        <div class="login-cabang-badges">
+          <span class="login-badge">Cabang WKA</span>
+          <span class="login-badge">Cabang Buper</span>
+          <span class="login-badge">Manager Pusat</span>
+        </div>
+      </div>
+
+      <!-- Right form panel — placeholder, filled by Streamlit below -->
+      <div class="login-right" id="login-form-anchor">
+        <div class="login-form-header">
+          <div class="login-form-title">Masuk ke Akun</div>
+          <div class="login-form-sub">Gunakan kredensial yang diberikan oleh admin.</div>
+        </div>
+      </div>
+    </div>
+    """, unsafe_allow_html=True)
+
+    # Streamlit form — rendered over/below the HTML shell
+    # We use a narrow centered column to approximate the right-panel position
+    gap_l, form_col, gap_r = st.columns([3.2, 2, 0.01])
+    with form_col:
+        st.markdown("<div style='margin-top:-2rem;'></div>", unsafe_allow_html=True)
 
         with st.form("form_login"):
-            username  = st.text_input("Username", placeholder="Masukkan username")
-            password  = st.text_input("Password", type="password", placeholder="Masukkan password")
-            login_btn = st.form_submit_button("Masuk", use_container_width=True, type="primary")
+            st.markdown(
+                "<p style='font-size:0.7rem;font-weight:700;text-transform:uppercase;"
+                "letter-spacing:0.1em;color:#94a3b8;margin-bottom:0.2rem;'>Username</p>",
+                unsafe_allow_html=True)
+            username = st.text_input("Username", placeholder="contoh: kasir_wka",
+                                     label_visibility="collapsed")
+
+            st.markdown(
+                "<p style='font-size:0.7rem;font-weight:700;text-transform:uppercase;"
+                "letter-spacing:0.1em;color:#94a3b8;margin:0.6rem 0 0.2rem;'>Password</p>",
+                unsafe_allow_html=True)
+            password = st.text_input("Password", type="password",
+                                     placeholder="Masukkan password",
+                                     label_visibility="collapsed")
+
+            st.markdown("<div style='height:0.5rem'></div>", unsafe_allow_html=True)
+            login_btn = st.form_submit_button(
+                "Masuk", use_container_width=True, type="primary")
 
         if login_btn:
             if not username or not password:
-                st.warning("Isi username dan password terlebih dahulu.")
+                st.warning("Username dan password wajib diisi.")
             else:
                 role, cabang = login_check(username, password)
                 if role:
@@ -948,17 +1214,50 @@ def show_login():
                     st.session_state.username  = username
                     st.rerun()
                 else:
-                    st.error("Username atau password salah.")
+                    st.error("Username atau password tidak ditemukan.")
 
         if not supabase:
             st.markdown("""
-            <div style='background:#fff7ed;border:1px solid #fed7aa;border-radius:8px;
-                        padding:0.8rem 1rem;margin-top:1rem;font-size:0.82rem;color:#9a3412;'>
-            <b>Mode Demo</b> — Supabase belum terhubung.<br>
-            Gunakan akun berikut (password: <code>demo123</code>):<br>
-            · <code>kasir_wka</code> / <code>kasir_buper</code> — Kasir<br>
-            · <code>manager_wka</code> / <code>manager_buper</code> — Manager Cabang<br>
-            · <code>pusat</code> — 🏢 <b>Manager Pusat</b> (pantau WKA &amp; Buper)
+            <div style='margin-top:1.2rem;padding:1rem 1.1rem;
+                        background:#f8fafc;border:1px solid #e2e8f0;
+                        border-radius:8px;font-size:0.78rem;color:#475569;'>
+              <div style='font-weight:700;color:#334155;margin-bottom:0.6rem;
+                          font-size:0.7rem;text-transform:uppercase;letter-spacing:0.08em;'>
+                Mode Demo &mdash; password: <code style="background:#eef2ff;
+                color:#4f46e5;padding:1px 6px;border-radius:4px;">demo123</code>
+              </div>
+              <table class="demo-table">
+                <tr>
+                  <th>Username</th>
+                  <th>Peran</th>
+                  <th>Cabang</th>
+                </tr>
+                <tr>
+                  <td><code>kasir_wka</code></td>
+                  <td><span class="demo-role-badge badge-kasir">Kasir</span></td>
+                  <td>WKA</td>
+                </tr>
+                <tr>
+                  <td><code>kasir_buper</code></td>
+                  <td><span class="demo-role-badge badge-kasir">Kasir</span></td>
+                  <td>Buper</td>
+                </tr>
+                <tr>
+                  <td><code>manager_wka</code></td>
+                  <td><span class="demo-role-badge badge-manager">Manager</span></td>
+                  <td>WKA</td>
+                </tr>
+                <tr>
+                  <td><code>manager_buper</code></td>
+                  <td><span class="demo-role-badge badge-manager">Manager</span></td>
+                  <td>Buper</td>
+                </tr>
+                <tr>
+                  <td><code>pusat</code></td>
+                  <td><span class="demo-role-badge badge-pusat">Manager Pusat</span></td>
+                  <td>Semua</td>
+                </tr>
+              </table>
             </div>
             """, unsafe_allow_html=True)
 
@@ -968,36 +1267,66 @@ def show_sidebar():
         role   = st.session_state.role
         cabang = st.session_state.cabang
 
+        # ── Brand header ─────────────────────────────────────────────────────
+        scope_label = "Semua Cabang" if role == "manager_pusat" else f"Cabang {cabang}"
         st.markdown(f"""
-        <div style='text-align:center;padding:1rem 0 0.8rem;
-                    border-bottom:1px solid rgba(255,255,255,0.15);margin-bottom:1rem;'>
-            <div style='font-size:1.1rem;font-weight:800;color:#c7d2fe;letter-spacing:0.05em;'>INVENTARIS KAFE</div>
-            <div style='font-size:0.95rem;font-weight:700;margin-top:6px;letter-spacing:0.02em;'>Inventaris Kafe</div>
-            <div style='font-size:0.75rem;opacity:0.6;margin-top:2px;'>
-                {"Semua Cabang" if role == "manager_pusat" else f"Cabang {cabang}"}
+        <div style='padding:1.2rem 1rem 1rem;
+                    border-bottom:1px solid rgba(99,102,241,0.25);
+                    margin-bottom:0.75rem;'>
+            <div style='font-size:0.62rem;font-weight:700;letter-spacing:0.18em;
+                        text-transform:uppercase;color:#6366f1;margin-bottom:0.4rem;'>
+                Inventaris Kafe
+            </div>
+            <div style='font-size:1.1rem;font-weight:800;color:#ffffff;
+                        letter-spacing:-0.01em;line-height:1.2;'>
+                Manajemen<br>Bahan Baku
+            </div>
+            <div style='font-size:0.72rem;color:#818cf8;margin-top:0.35rem;
+                        font-weight:500;'>
+                {scope_label}
             </div>
         </div>
         """, unsafe_allow_html=True)
 
+        # ── User info card ────────────────────────────────────────────────────
         if role == "manager_pusat":
-            icon   = ""
-            badge  = '<span class="role-badge-pusat">Manager Pusat</span>'
+            role_label = "Manager Pusat"
+            role_bg    = "rgba(99,102,241,0.25)"
+            role_color = "#a5b4fc"
         elif role == "manager":
-            icon   = ""
-            badge  = '<span class="role-badge-mgr">Manager</span>'
+            role_label = "Manager"
+            role_bg    = "rgba(16,185,129,0.2)"
+            role_color = "#6ee7b7"
         else:
-            icon   = ""
-            badge  = ""
+            role_label = "Kasir"
+            role_bg    = "rgba(255,255,255,0.08)"
+            role_color = "#94a3b8"
 
         st.markdown(f"""
-        <div style='background:rgba(255,255,255,0.09);border-radius:10px;
-                    padding:0.6rem 0.8rem;margin-bottom:1.2rem;font-size:0.85rem;'>
-            {icon} <b>{st.session_state.username}</b>&nbsp;{badge}<br>
-            <span style='opacity:0.6;font-size:0.75rem;'>
-                {"Pemantau Lintas Cabang" if role == "manager_pusat" else f"Cabang {cabang}"}
-            </span>
+        <div style='background:rgba(255,255,255,0.05);
+                    border:1px solid rgba(99,102,241,0.2);
+                    border-radius:8px;
+                    padding:0.65rem 0.85rem;
+                    margin-bottom:1rem;'>
+            <div style='font-size:0.82rem;font-weight:700;color:#e0e7ff;
+                        margin-bottom:0.2rem;'>
+                {st.session_state.username}
+            </div>
+            <div style='display:inline-block;background:{role_bg};
+                        color:{role_color};border-radius:4px;
+                        padding:1px 8px;font-size:0.68rem;font-weight:700;
+                        letter-spacing:0.04em;'>
+                {role_label}
+            </div>
         </div>
         """, unsafe_allow_html=True)
+
+        # ── Navigation ────────────────────────────────────────────────────────
+        st.markdown(
+            "<div style='font-size:0.6rem;font-weight:700;text-transform:uppercase;"
+            "letter-spacing:0.14em;color:#4f46e5;padding:0 0.25rem 0.4rem;'>"
+            "Navigasi</div>",
+            unsafe_allow_html=True)
 
         if role == "manager_pusat":
             pages = [
@@ -1015,8 +1344,11 @@ def show_sidebar():
 
         page = st.radio("Menu", pages, label_visibility="collapsed")
 
-        st.markdown("<div style='margin-top:2rem;border-top:1px solid rgba(255,255,255,0.1);padding-top:1rem;'></div>",
-                    unsafe_allow_html=True)
+        # ── Logout ────────────────────────────────────────────────────────────
+        st.markdown(
+            "<div style='margin-top:auto;padding-top:1.5rem;"
+            "border-top:1px solid rgba(99,102,241,0.15);margin-top:2rem;'></div>",
+            unsafe_allow_html=True)
         if st.button("Keluar", use_container_width=True):
             for k in list(st.session_state.keys()):
                 del st.session_state[k]
