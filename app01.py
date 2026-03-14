@@ -939,135 +939,163 @@ def login_check(username: str, password: str):
 # ─── LOGIN ───────────────────────────────────────────────────────────────────────
 def show_login():
     """
-    Halaman login dua-kolom Tailwind-style.
-    Teknik: CSS inject untuk warna/layout global, lalu st.columns untuk split kiri-kanan.
-    Tidak menggunakan position:fixed agar compatible dengan Streamlit iframe sandbox.
+    Halaman login — panel kiri warna indigo menggunakan CSS inject pada
+    elemen kolom Streamlit (data-testid=stColumn), bukan position:fixed
+    atau display:flex yang di-strip Streamlit sanitizer.
+    Panel kanan: form bersih native Streamlit.
     """
     st.markdown("""
     <style>
-        /* Sembunyikan chrome Streamlit di halaman login */
-        header[data-testid="stHeader"]        { display: none !important; }
-        section[data-testid="stSidebar"]      { display: none !important; }
-        [data-testid="stToolbar"]             { display: none !important; }
-        .block-container {
-            padding: 0 !important;
+        /* Sembunyikan chrome Streamlit */
+        header[data-testid="stHeader"]   { display: none !important; }
+        #MainMenu                        { display: none !important; }
+        footer                           { display: none !important; }
+        [data-testid="stToolbar"]        { display: none !important; }
+        section[data-testid="stSidebar"] { display: none !important; }
+
+        /* Hapus padding default halaman */
+        .main .block-container {
+            padding-top: 0 !important;
+            padding-bottom: 0 !important;
+            padding-left: 0 !important;
+            padding-right: 0 !important;
             max-width: 100% !important;
         }
-        /* Panel kiri indigo — diterapkan ke kolom pertama */
-        div[data-testid="column"]:first-child > div:first-child {
-            background: linear-gradient(155deg, #312e81 0%, #3730a3 45%, #4338ca 75%, #6366f1 100%);
-            min-height: 100vh;
-            padding: 0 !important;
+        .main { padding: 0 !important; }
+
+        /* Panel kiri — kolom pertama dari st.columns */
+        [data-testid="stHorizontalBlock"] > div:first-child {
+            background: linear-gradient(160deg, #312e81 0%, #3730a3 45%, #4338ca 100%) !important;
+            min-height: 100vh !important;
+            padding: 4rem 3rem !important;
         }
-        /* Tombol primary → indigo */
-        button[kind="primaryFormSubmit"],
-        .stButton > button[kind="primary"],
-        button[data-testid="baseButton-primaryFormSubmit"] {
+        [data-testid="stHorizontalBlock"] > div:first-child * {
+            color: #e0e7ff !important;
+        }
+
+        /* Panel kanan — kolom kedua */
+        [data-testid="stHorizontalBlock"] > div:last-child {
+            background: #ffffff !important;
+            min-height: 100vh !important;
+            padding: 3rem 2.5rem !important;
+            box-shadow: -2px 0 24px rgba(49,46,129,0.08) !important;
+        }
+
+        /* Tombol primary → indigo (semua selector Streamlit) */
+        .stFormSubmitButton > button,
+        [data-testid="stFormSubmitButton"] > button,
+        button[data-testid="baseButton-primaryFormSubmit"],
+        .stButton > button[kind="primary"] {
             background-color: #4f46e5 !important;
             border-color: #4f46e5 !important;
             color: #ffffff !important;
+            border-radius: 8px !important;
+            font-weight: 600 !important;
+            height: 2.75rem !important;
+            font-size: 0.9rem !important;
         }
-        button[kind="primaryFormSubmit"]:hover,
-        .stButton > button[kind="primary"]:hover {
+        .stFormSubmitButton > button:hover,
+        button[data-testid="baseButton-primaryFormSubmit"]:hover {
             background-color: #3730a3 !important;
             border-color: #3730a3 !important;
         }
-        /* Input focus ring indigo */
-        .stTextInput input:focus {
+
+        /* Input fields */
+        .stTextInput > div > div > input {
+            border: 1.5px solid #e2e8f0 !important;
+            border-radius: 8px !important;
+        }
+        .stTextInput > div > div > input:focus {
             border-color: #6366f1 !important;
-            box-shadow: 0 0 0 3px rgba(99,102,241,0.15) !important;
+            box-shadow: 0 0 0 3px rgba(99,102,241,0.12) !important;
         }
     </style>
     """, unsafe_allow_html=True)
 
-    col_left, col_right = st.columns([6, 4], gap="small")
+    col_left, col_right = st.columns([55, 45], gap="small")
 
-    # ── Panel kiri: branding indigo ───────────────────────────────────────────
+    # ── Kolom kiri: branding indigo via Streamlit-safe components ────────────
     with col_left:
-        st.markdown("""
-        <div style="
-            background: linear-gradient(155deg, #312e81 0%, #3730a3 45%, #4338ca 75%, #6366f1 100%);
-            min-height: 100vh;
-            padding: 5rem 4rem;
-            display: flex;
-            flex-direction: column;
-            justify-content: center;
-            position: relative;
-            overflow: hidden;
-        ">
-            <!-- Lingkaran dekoratif -->
-            <div style="position:absolute;top:-80px;right:-80px;width:300px;height:300px;
-                        border-radius:50%;background:rgba(255,255,255,0.06);pointer-events:none;"></div>
-            <div style="position:absolute;bottom:-60px;left:-60px;width:220px;height:220px;
-                        border-radius:50%;background:rgba(255,255,255,0.05);pointer-events:none;"></div>
+        # Spacer atas
+        st.markdown("<div style='height:6vh'></div>", unsafe_allow_html=True)
 
-            <!-- Konten -->
-            <div style="position:relative;z-index:1;">
-                <div style="font-size:0.68rem;font-weight:700;letter-spacing:0.2em;
-                            text-transform:uppercase;color:#a5b4fc;margin-bottom:1.4rem;">
-                    Sistem Inventaris Kafe
-                </div>
-                <div style="font-size:2.8rem;font-weight:900;color:#ffffff;
-                            line-height:1.08;letter-spacing:-0.03em;margin-bottom:0.7rem;">
-                    Kelola Stok<br>Dengan Tepat
-                </div>
-                <div style="font-size:0.95rem;color:#c7d2fe;line-height:1.7;
-                            max-width:360px;margin-bottom:2.5rem;">
-                    Pencatatan bahan baku dan packaging yang terstruktur,
-                    transparan, dan dapat diaudit kapan saja.
-                </div>
+        # Tag kecil uppercase
+        st.markdown(
+            "<p style='font-size:0.68rem;font-weight:700;letter-spacing:0.2em;"
+            "text-transform:uppercase;color:#a5b4fc;margin:0 0 1.2rem;'>"
+            "Sistem Inventaris Kafe</p>",
+            unsafe_allow_html=True,
+        )
 
-                <div style="display:flex;align-items:center;gap:10px;margin-bottom:0.7rem;">
-                    <div style="width:6px;height:6px;border-radius:50%;background:#818cf8;flex-shrink:0;"></div>
-                    <span style="font-size:0.875rem;color:#c7d2fe;">Monitor kadaluarsa &amp; restock otomatis</span>
-                </div>
-                <div style="display:flex;align-items:center;gap:10px;margin-bottom:0.7rem;">
-                    <div style="width:6px;height:6px;border-radius:50%;background:#818cf8;flex-shrink:0;"></div>
-                    <span style="font-size:0.875rem;color:#c7d2fe;">Analitik pengeluaran &amp; volatilitas harga</span>
-                </div>
-                <div style="display:flex;align-items:center;gap:10px;margin-bottom:0.7rem;">
-                    <div style="width:6px;height:6px;border-radius:50%;background:#818cf8;flex-shrink:0;"></div>
-                    <span style="font-size:0.875rem;color:#c7d2fe;">Multi-cabang dengan role Manager Pusat</span>
-                </div>
-                <div style="display:flex;align-items:center;gap:10px;">
-                    <div style="width:6px;height:6px;border-radius:50%;background:#818cf8;flex-shrink:0;"></div>
-                    <span style="font-size:0.875rem;color:#c7d2fe;">Bukti invoice: unggah file atau kamera</span>
-                </div>
-            </div>
+        # Heading besar
+        st.markdown(
+            "<h1 style='font-size:2.6rem;font-weight:900;color:#ffffff;"
+            "line-height:1.08;letter-spacing:-0.03em;margin:0 0 0.8rem;'>"
+            "Kelola Stok<br>Dengan Tepat</h1>",
+            unsafe_allow_html=True,
+        )
 
-            <!-- Footer kecil -->
-            <div style="position:absolute;bottom:2rem;left:4rem;
-                        font-size:0.68rem;color:rgba(165,180,252,0.5);letter-spacing:0.06em;">
-                Inventaris Kafe &nbsp;&middot;&nbsp; WKA &amp; Buper
-            </div>
-        </div>
-        """, unsafe_allow_html=True)
+        # Deskripsi
+        st.markdown(
+            "<p style='font-size:0.95rem;color:#c7d2fe;line-height:1.7;"
+            "max-width:340px;margin:0 0 2rem;'>"
+            "Pencatatan bahan baku dan packaging yang terstruktur, "
+            "transparan, dan dapat diaudit kapan saja.</p>",
+            unsafe_allow_html=True,
+        )
 
-    # ── Panel kanan: form login ───────────────────────────────────────────────
+        # Bullet fitur — pakai st.markdown per baris, aman dari sanitizer
+        fitur = [
+            "Monitor kadaluarsa &amp; restock otomatis",
+            "Analitik pengeluaran &amp; volatilitas harga",
+            "Multi-cabang dengan role Manager Pusat",
+            "Bukti invoice: unggah file atau kamera",
+        ]
+        for f in fitur:
+            st.markdown(
+                f"<p style='font-size:0.875rem;color:#c7d2fe;"
+                f"margin:0 0 0.55rem;padding-left:1rem;"
+                f"border-left:3px solid #6366f1;'>{f}</p>",
+                unsafe_allow_html=True,
+            )
+
+        # Footer cabang
+        st.markdown("<div style='height:4vh'></div>", unsafe_allow_html=True)
+        st.markdown(
+            "<p style='font-size:0.68rem;color:rgba(165,180,252,0.55);"
+            "letter-spacing:0.06em;margin:0;'>"
+            "Inventaris Kafe &nbsp;&middot;&nbsp; WKA &amp; Buper</p>",
+            unsafe_allow_html=True,
+        )
+
+    # ── Kolom kanan: form login ───────────────────────────────────────────────
     with col_right:
-        # Padding vertikal agar form ada di tengah
-        st.markdown("<div style='min-height:25vh'></div>", unsafe_allow_html=True)
+        st.markdown("<div style='height:20vh'></div>", unsafe_allow_html=True)
 
-        st.markdown("""
-        <div style="padding: 0 1.5rem 0 2rem;">
-            <div style="font-size:0.68rem;font-weight:700;letter-spacing:0.16em;
-                        text-transform:uppercase;color:#6366f1;margin-bottom:0.5rem;">
-                Selamat datang
-            </div>
-            <div style="font-size:1.8rem;font-weight:800;color:#0f172a;
-                        letter-spacing:-0.02em;line-height:1.15;margin-bottom:0.4rem;">
-                Masuk ke Akun
-            </div>
-            <div style="font-size:0.875rem;color:#64748b;margin-bottom:0.2rem;">
-                Gunakan kredensial yang diberikan oleh admin.
-            </div>
-        </div>
-        """, unsafe_allow_html=True)
+        st.markdown(
+            "<p style='font-size:0.68rem;font-weight:700;letter-spacing:0.16em;"
+            "text-transform:uppercase;color:#6366f1;margin:0 0 0.4rem;'>"
+            "Selamat datang</p>",
+            unsafe_allow_html=True,
+        )
+        st.markdown(
+            "<h2 style='font-size:1.75rem;font-weight:800;color:#0f172a;"
+            "letter-spacing:-0.02em;margin:0 0 0.3rem;'>"
+            "Masuk ke Akun</h2>",
+            unsafe_allow_html=True,
+        )
+        st.markdown(
+            "<p style='font-size:0.875rem;color:#64748b;margin:0 0 1.4rem;'>"
+            "Gunakan kredensial yang diberikan oleh admin.</p>",
+            unsafe_allow_html=True,
+        )
 
         with st.form("form_login", clear_on_submit=False):
-            username  = st.text_input("Username", placeholder="Contoh: kasir_wka")
-            password  = st.text_input("Password", type="password", placeholder="Masukkan password")
-            login_btn = st.form_submit_button("Masuk", use_container_width=True, type="primary")
+            username  = st.text_input("Username", placeholder="")
+            password  = st.text_input("Password", type="password", placeholder="")
+            login_btn = st.form_submit_button(
+                "Masuk", use_container_width=True, type="primary"
+            )
 
         if login_btn:
             if not username or not password:
@@ -1084,32 +1112,32 @@ def show_login():
                     st.error("Username atau password tidak valid.")
 
         if not supabase:
-            st.markdown("""
-            <div style="margin-top:1rem;padding:0.85rem 1rem;
-                        background:#f8fafc;border:1px solid #e2e8f0;
-                        border-radius:8px;font-size:0.78rem;color:#475569;line-height:1.75;">
-                <b style="color:#3730a3;">Mode Demo</b> — Supabase belum terhubung.<br>
-                Password semua akun: <code style="background:#e0e7ff;color:#3730a3;
-                border-radius:3px;padding:1px 5px;">demo123</code><br>
-                <code style="background:#e0e7ff;color:#3730a3;border-radius:3px;padding:1px 5px;">kasir_wka</code>
-                &nbsp;/&nbsp;
-                <code style="background:#e0e7ff;color:#3730a3;border-radius:3px;padding:1px 5px;">kasir_buper</code>
-                &nbsp;&mdash; Kasir<br>
-                <code style="background:#e0e7ff;color:#3730a3;border-radius:3px;padding:1px 5px;">manager_wka</code>
-                &nbsp;/&nbsp;
-                <code style="background:#e0e7ff;color:#3730a3;border-radius:3px;padding:1px 5px;">manager_buper</code>
-                &nbsp;&mdash; Manager<br>
-                <code style="background:#e0e7ff;color:#3730a3;border-radius:3px;padding:1px 5px;">pusat</code>
-                &nbsp;&mdash; Manager Pusat (lintas cabang)
-            </div>
-            """, unsafe_allow_html=True)
+            st.markdown(
+                "<div style='margin-top:1rem;padding:0.85rem 1rem;"
+                "background:#f8fafc;border:1px solid #e2e8f0;"
+                "border-radius:8px;font-size:0.78rem;color:#475569;line-height:1.75;'>"
+                "<b style='color:#3730a3;'>Mode Demo</b> — Supabase belum terhubung.<br>"
+                "Password semua akun: "
+                "<code style='background:#e0e7ff;color:#3730a3;border-radius:3px;"
+                "padding:1px 5px;font-size:0.75rem;'>demo123</code><br>"
+                "<code style='background:#e0e7ff;color:#3730a3;border-radius:3px;"
+                "padding:1px 5px;'>kasir_wka</code> / "
+                "<code style='background:#e0e7ff;color:#3730a3;border-radius:3px;"
+                "padding:1px 5px;'>kasir_buper</code> &mdash; Kasir<br>"
+                "<code style='background:#e0e7ff;color:#3730a3;border-radius:3px;"
+                "padding:1px 5px;'>manager_wka</code> / "
+                "<code style='background:#e0e7ff;color:#3730a3;border-radius:3px;"
+                "padding:1px 5px;'>manager_buper</code> &mdash; Manager<br>"
+                "<code style='background:#e0e7ff;color:#3730a3;border-radius:3px;"
+                "padding:1px 5px;'>pusat</code> &mdash; Manager Pusat</div>",
+                unsafe_allow_html=True,
+            )
 
-        st.markdown("""
-        <div style="text-align:center;font-size:0.7rem;color:#94a3b8;
-                    margin-top:1.5rem;padding:0 1.5rem;">
-            Hubungi admin jika mengalami masalah akses.
-        </div>
-        """, unsafe_allow_html=True)
+        st.markdown(
+            "<p style='font-size:0.7rem;color:#94a3b8;text-align:center;"
+            "margin-top:1.2rem;'>Hubungi admin jika mengalami masalah akses.</p>",
+            unsafe_allow_html=True,
+        )
 
 
 # ─── SIDEBAR ─────────────────────────────────────────────────────────────────────
