@@ -1695,9 +1695,22 @@ def page_dashboard(df: pd.DataFrame, cabang_label: str = None):
             total_kat = kat_grp["Total (Rp)"].sum()
             for _, r in kat_grp.iterrows():
                 pct = r["Total (Rp)"] / total_kat * 100 if total_kat > 0 else 0
-                st.markdown(f"**{r['kategori']}**")
-                st.progress(int(pct),
-                            text=f"Rp {r['Total (Rp)']:,.0f} · {pct:.1f}%")
+                bar_w = max(int(pct), 2)
+                st.markdown(
+                    f"<div style='margin:0 0 0.65rem;'>"
+                    f"<div style='display:flex;justify-content:space-between;"
+                    f"align-items:baseline;margin-bottom:4px;'>"
+                    f"<span style='font-size:0.82rem;font-weight:600;color:#1e293b;'>"
+                    f"{r['kategori']}</span>"
+                    f"<span style='font-size:0.78rem;color:#64748b;'>"
+                    f"Rp {r['Total (Rp)']:,.0f} &nbsp;·&nbsp; {pct:.1f}%</span>"
+                    f"</div>"
+                    f"<div style='background:#f1f5f9;border-radius:4px;height:6px;'>"
+                    f"<div style='background:#4f46e5;width:{bar_w}%;height:6px;"
+                    f"border-radius:4px;'></div></div>"
+                    f"</div>",
+                    unsafe_allow_html=True,
+                )
             if len(kat_grp) >= 2:
                 dom = kat_grp.iloc[0]
                 dom_pct = dom["Total (Rp)"] / total_kat * 100
@@ -3061,8 +3074,23 @@ def page_perbandingan_cabang(data: dict):
         kat_g = df.groupby("kategori")[col_h].sum().sort_values(ascending=False)
         total = kat_g.sum()
         for kat, val in kat_g.items():
-            pct = val / total * 100 if total > 0 else 0
-            col.progress(int(pct), text=f"{kat}: Rp {val:,.0f} · {pct:.1f}%")
+            pct   = val / total * 100 if total > 0 else 0
+            bar_w = max(int(pct), 2)
+            col.markdown(
+                f"<div style='margin:0 0 0.6rem;'>"
+                f"<div style='display:flex;justify-content:space-between;"
+                f"align-items:baseline;margin-bottom:4px;'>"
+                f"<span style='font-size:0.8rem;font-weight:600;color:#1e293b;'>"
+                f"{kat}</span>"
+                f"<span style='font-size:0.75rem;color:#64748b;'>"
+                f"Rp {val:,.0f} &nbsp;·&nbsp; {pct:.1f}%</span>"
+                f"</div>"
+                f"<div style='background:#f1f5f9;border-radius:4px;height:6px;'>"
+                f"<div style='background:#4f46e5;width:{bar_w}%;height:6px;"
+                f"border-radius:4px;'></div></div>"
+                f"</div>",
+                unsafe_allow_html=True,
+            )
 
     st.divider()
 
