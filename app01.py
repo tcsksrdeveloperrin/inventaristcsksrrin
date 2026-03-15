@@ -850,7 +850,7 @@ KOLOM_DB = [
     "kategori", "sub_kategori", "nama_barang", "merk", "grind_size",
     "qty", "uom_qty", "vol_per_unit", "uom_vol", "netto_total",
     "harga_total",
-    "tgl_kadaluarsa", "status_pembayaran", "catatan", "created_at",
+    "tgl_kadaluarsa", "status_pembayaran", "catatan", "foto_invoice", "created_at",
 ]
 
 # ─── SESSION STATE ───────────────────────────────────────────────────────────────
@@ -976,6 +976,218 @@ def login_check(username: str, password: str):
     if username in DEMO_USERS and password == "demo123":
         return DEMO_USERS[username]
     return None, None
+
+# ─── HELPER: FOTO INVOICE — TAMPIL & AKSI ───────────────────────────────────────
+
+def get_foto_url(fname: str) -> str | None:
+    """
+    Kembalikan public URL foto dari Supabase Storage.
+    Jika Supabase tidak tersedia atau file tidak ada, return None.
+    """
+    if not supabase or not fname:
+        return None
+    try:
+        resp = supabase.storage.from_("invoice-foto").get_public_url(fname)
+        # resp bisa berupa string URL atau dict tergantung versi SDK
+        if isinstance(resp, str):
+            return resp
+        if isinstance(resp, dict):
+            return resp.get("publicUrl") or resp.get("data", {}).get("publicUrl")
+        return None
+    except Exception:
+        return None
+
+
+def hapus_foto_storage(fname: str) -> bool:
+    """Hapus file foto dari Supabase Storage. Return True jika berhasil."""
+    if not supabase or not fname:
+        return False
+    try:
+        supabase.storage.from_("invoice-foto").remove([fname])
+        return True
+    except Exception:
+        return False
+
+
+def update_foto_invoice(row_id, new_fname: str | None) -> bool:
+    """Update kolom foto_invoice di DB untuk row tertentu."""
+    return update_row(row_id, {"foto_invoice": new_fname})
+
+
+def render_foto_riwayat(row_id, fname: str | None, key_prefix: str):
+    """
+    Panel bukti invoice di tab Riwayat.
+
+    Akses per role:
+      - Kasir (kedua cabang) : lihat foto + ganti/reupload foto
+      - Manager (kedua cabang): lihat + ganti + HAPUS foto
+      - Manager Pusat        : lihat + ganti + hapus foto (read-only lintas cabang)
+
+    Menggunakan key_prefix unik per baris agar widget tidak konflik antar baris.
+    """
+    role = st.session_state.get("role", "kasir")
+    bisa_hapus  = role in ("manager", "manager_pusat")
+    bisa_ganti  = True   # semua role bisa ganti/reupload
+
+    # ── Jika tidak ada foto ───────────────────────────────────────────────────
+    if not fname or str(fname).strip() in ("", "None", "nan"):
+        st.markdown(
+            "<div style='background:#f8fafc;border:1px dashed #e2e8f0;"
+            "border-radius:8px;padding:14px;font-size:0.8rem;color:#94a3b8;"
+            "text-align:center;line-height:1.6;'>"
+            "Belum ada bukti invoice terlampir.<br>"
+            "<span style='font-size:0.72rem;'>Klik tombol di bawah untuk melampirkan.</span>"
+            "</div>",
+            unsafe_allow_html=True,
+        )
+        if bisa_ganti:
+            with st.expander("Lampirkan Foto Sekarang", expanded=False):
+                _render_reupload_widget(row_id, None, key_prefix)
+        return
+
+    # ── Ada foto — coba tampilkan via Supabase public URL ────────────────────
+    url = get_foto_url(fname)
+    ext = fname.rsplit(".", 1)[-1].lower() if "." in fname else "jpg"
+
+    if url:
+        if ext in ("jpg", "jpeg", "png", "webp"):
+            st.image(url, use_container_width=True)
+        elif ext == "pdf":
+            st.markdown(
+                f"<a href='{url}' target='_blank'"
+                f" style='display:block;background:#eef2ff;border:1px solid #c7d2fe;"
+                f"border-radius:7px;padding:9px 12px;font-size:0.8rem;color:#4f46e5;"
+                f"font-weight:600;text-decoration:none;text-align:center;'>"
+                f"Buka PDF Invoice</a>",
+                unsafe_allow_html=True,
+            )
+    else:
+        # Supabase offline/tidak tersedia — tampilkan nama file dengan info
+        st.markdown(
+            f"<div style='background:#fafafa;border:1px solid #e0e7ff;"
+            f"border-radius:7px;padding:9px 12px;font-size:0.78rem;color:#475569;'>"
+            f"<span style='font-size:0.66rem;font-weight:700;text-transform:uppercase;"
+            f"letter-spacing:0.08em;color:#94a3b8;'>File tersimpan</span><br>"
+            f"<b style='color:#4f46e5;'>{fname}</b><br>"
+            f"<span style='font-size:0.72rem;color:#94a3b8;'>"
+            f"Hubungkan Supabase untuk melihat gambar.</span></div>",
+            unsafe_allow_html=True,
+        )
+    # Nama file kecil di bawah gambar
+    st.caption(fname)
+
+    # ── Aksi: Ganti dan/atau Hapus ────────────────────────────────────────────
+    st.markdown("<div style='height:2px'></div>", unsafe_allow_html=True)
+
+    if bisa_hapus:
+        col_ganti, col_hapus = st.columns(2)
+        ganti_col = col_ganti
+        hapus_col = col_hapus
+    else:
+        ganti_col = st.container()
+        hapus_col = None
+
+    # Tombol Ganti — semua role
+    with ganti_col:
+        with st.expander("Ganti / Reupload Foto", expanded=False):
+            _render_reupload_widget(row_id, fname, key_prefix)
+
+    # Tombol Hapus — hanya manager
+    if bisa_hapus and hapus_col is not None:
+        with hapus_col:
+            hapus_key    = f"btn_hapus_foto_{key_prefix}"
+            confirm_skey = f"hapus_foto_confirm_{key_prefix}"
+            st.markdown("<div style='height:4px'></div>", unsafe_allow_html=True)
+
+            if not st.session_state.get(confirm_skey):
+                if st.button("Hapus Foto", key=hapus_key, use_container_width=True):
+                    st.session_state[confirm_skey] = True
+                    st.rerun()
+            else:
+                st.warning("Yakin hapus? Tidak bisa dikembalikan.")
+                ya_k, tdk_k = st.columns(2)
+                with ya_k:
+                    if st.button("Ya, Hapus", key=f"ya_{key_prefix}",
+                                 type="primary", use_container_width=True):
+                        hapus_foto_storage(fname)
+                        update_foto_invoice(row_id, None)
+                        st.session_state.pop(confirm_skey, None)
+                        st.success("Foto dihapus.")
+                        st.rerun()
+                with tdk_k:
+                    if st.button("Batal", key=f"batal_{key_prefix}",
+                                 use_container_width=True):
+                        st.session_state.pop(confirm_skey, None)
+                        st.rerun()
+
+
+def _render_reupload_widget(row_id, old_fname: str | None, key_prefix: str):
+    """
+    Widget upload/kamera untuk mengganti atau melampirkan foto baru
+    langsung dari tab Riwayat. Tersedia untuk semua role.
+    """
+
+    def _build_fname_reupload(ext: str) -> tuple:
+        now = datetime.now()
+        return (f"reupload_{row_id}_{now.strftime('%Y%m%d%H%M%S')}.{ext}", now)
+
+    def _simpan_foto(fbytes: bytes, fname_new: str, mime: str, old: str | None):
+        """Upload ke storage + update DB. Handle mode lokal juga."""
+        if old_fname:
+            hapus_foto_storage(old)
+        if supabase:
+            try:
+                supabase.storage.from_("invoice-foto").upload(
+                    path=fname_new, file=fbytes,
+                    file_options={"content-type": mime},
+                )
+            except Exception as e:
+                st.warning(f"Upload ke storage gagal ({e}). Nama file tetap diperbarui di DB.")
+        update_foto_invoice(row_id, fname_new)
+        st.success(f"Foto diperbarui: {fname_new}")
+        st.rerun()
+
+    metode = st.radio(
+        "Metode",
+        ["Unggah file", "Kamera"],
+        horizontal=True,
+        key=f"metode_reupload_{key_prefix}",
+    )
+
+    if metode == "Unggah file":
+        up = st.file_uploader(
+            "Pilih file",
+            type=["jpg", "jpeg", "png", "pdf", "webp"],
+            key=f"reupload_file_{key_prefix}",
+            label_visibility="collapsed",
+            help="Format: JPG, PNG, PDF, WebP — maks 10 MB",
+        )
+        if up is not None:
+            fbytes    = up.read()
+            ext       = up.name.rsplit(".", 1)[-1].lower() if "." in up.name else "jpg"
+            mime      = up.type or "image/jpeg"
+            fname_new, _ = _build_fname_reupload(ext)
+            if mime.startswith("image/"):
+                st.image(fbytes, use_container_width=True)
+            else:
+                st.info(f"PDF: {up.name} ({len(fbytes)//1024} KB)")
+            if st.button("Simpan Foto Baru", key=f"simpan_reupload_{key_prefix}",
+                         type="primary", use_container_width=True):
+                _simpan_foto(fbytes, fname_new, mime, old_fname)
+
+    else:  # Kamera
+        cam = st.camera_input(
+            "Arahkan kamera ke nota lalu Capture",
+            key=f"reupload_cam_{key_prefix}",
+        )
+        if cam is not None:
+            fbytes    = cam.getvalue()
+            fname_new, _ = _build_fname_reupload("jpg")
+            st.image(fbytes, use_container_width=True)
+            if st.button("Simpan Foto Baru", key=f"simpan_reupload_cam_{key_prefix}",
+                         type="primary", use_container_width=True):
+                _simpan_foto(fbytes, fname_new, "image/jpeg", old_fname)
+
 
 # ─── LOGIN ───────────────────────────────────────────────────────────────────────
 def show_login():
@@ -1297,14 +1509,16 @@ def _get_s2_grind() -> str:
 # ─── HELPER: FOTO / FILE INVOICE ────────────────────────────────────────────────
 def render_foto_invoice():
     """
-    Lampiran bukti invoice: pengguna dapat memilih antara
-    (a) unggah file dari penyimpanan perangkat, atau
-    (b) ambil foto langsung via kamera perangkat.
-
+    Lampiran bukti invoice — dua mode: unggah file atau kamera langsung.
+    
+    FIX: Foto/file di-persist ke session_state agar tidak hilang saat
+    st.rerun() dipanggil (misalnya setelah tambah item ke keranjang).
+    State kunci: st.session_state["foto_invoice_data"] = {bytes, fname, jam}
+    
     Mengembalikan (bytes | None, nama_file | None, jam_str | None).
-    Format nama file: {no_nota}_{cabang}_{YYYYMMDD}_{HHMMSS}.{ext}
     """
 
+    # ── Helper: bangun nama file terstandar ──────────────────────────────────
     def _build_filename(ext: str) -> tuple:
         now       = datetime.now()
         nota      = st.session_state.get("s1_nota", "NONOTA").strip() or "NONOTA"
@@ -1314,6 +1528,7 @@ def render_foto_invoice():
         fname     = f"{nota_cl}_{cabang_cl}_{now.strftime('%Y%m%d')}_{now.strftime('%H%M%S')}.{ext}"
         return fname, now
 
+    # ── Helper: upload ke Supabase Storage (opsional) ────────────────────────
     def _upload_to_storage(file_bytes: bytes, fname: str, mime: str):
         if supabase:
             try:
@@ -1322,29 +1537,58 @@ def render_foto_invoice():
                     file=file_bytes,
                     file_options={"content-type": mime},
                 )
-                st.success(f"Berhasil diunggah ke storage: {fname}")
+                st.success(f"Tersimpan ke storage: {fname}")
             except Exception as e:
-                st.warning(f"Gagal unggah ke storage ({e}). File tetap tercatat di sesi ini.")
-        else:
-            st.info(f"Nama file: {fname}")
+                st.warning(f"Upload storage gagal ({e}). File tetap tercatat di sesi ini.")
 
-    # ── Pilihan metode lampiran ───────────────────────────────────────────────
+    # ── Inisialisasi state persisten foto ────────────────────────────────────
+    # Tujuan: foto yang sudah diambil/diunggah tidak hilang saat st.rerun()
+    if "foto_invoice_data" not in st.session_state:
+        st.session_state["foto_invoice_data"] = None  # None | dict
+
+    # ── Pilihan metode ────────────────────────────────────────────────────────
     metode = st.radio(
-        "Metode lampiran",
+        "Metode lampiran bukti",
         ["Unggah dari perangkat", "Kamera langsung"],
         horizontal=True,
         key="s1_metode_foto",
-        help="Pilih 'Unggah dari perangkat' untuk melampirkan file yang sudah ada, "
-             "atau 'Kamera langsung' untuk mengambil foto saat itu juga.",
     )
 
+    # ── Tombol hapus foto yang sudah ada ─────────────────────────────────────
+    if st.session_state["foto_invoice_data"] is not None:
+        saved = st.session_state["foto_invoice_data"]
+        st.markdown(
+            f"<div style='background:#f0fdf4;border:1px solid #bbf7d0;border-radius:7px;"
+            f"padding:8px 12px;font-size:0.82rem;color:#15803d;margin-bottom:6px;'>"
+            f"Foto terlampir: <b>{saved['fname']}</b></div>",
+            unsafe_allow_html=True,
+        )
+        col_prev, col_clear = st.columns([4, 1])
+        with col_prev:
+            if saved.get("mime", "").startswith("image/"):
+                st.image(saved["bytes"], use_container_width=True)
+            else:
+                st.info(f"PDF: {saved['fname']} ({len(saved['bytes'])//1024} KB)")
+        with col_clear:
+            if st.button("Ganti", key="btn_clear_foto", use_container_width=True):
+                st.session_state["foto_invoice_data"] = None
+                # Reset widget keys agar uploader/kamera muncul bersih
+                for k in ["s1_uploader", "s1_kamera"]:
+                    if k in st.session_state:
+                        del st.session_state[k]
+                st.rerun()
+
+        d = st.session_state["foto_invoice_data"]
+        return d["bytes"], d["fname"], d["jam"]
+
+    # ── Mode: Unggah file ────────────────────────────────────────────────────
     if metode == "Unggah dari perangkat":
         uploaded = st.file_uploader(
-            "Pilih file bukti invoice",
+            "Pilih file",
             type=["jpg", "jpeg", "png", "pdf", "webp"],
             key="s1_uploader",
-            help="Format didukung: JPG, PNG, PDF, WebP. Ukuran maks 10 MB.",
             label_visibility="collapsed",
+            help="Format: JPG, PNG, PDF, WebP — maks 10 MB",
         )
         if uploaded is not None:
             file_bytes = uploaded.read()
@@ -1352,28 +1596,46 @@ def render_foto_invoice():
             mime       = uploaded.type or "image/jpeg"
             fname, now = _build_filename(ext)
 
-            # Preview jika gambar
+            # Simpan ke session_state agar tahan rerun
+            st.session_state["foto_invoice_data"] = {
+                "bytes": file_bytes,
+                "fname": fname,
+                "jam":   now.strftime("%H:%M:%S"),
+                "mime":  mime,
+            }
+
+            # Preview
             if mime.startswith("image/"):
-                st.image(file_bytes, caption=f"Preview: {fname}", use_column_width=True)
+                st.image(file_bytes, use_container_width=True)
             else:
-                st.info(f"File PDF terlampir: {uploaded.name}  ({len(file_bytes)//1024} KB)")
+                st.info(f"PDF terlampir: {uploaded.name} ({len(file_bytes)//1024} KB)")
 
             _upload_to_storage(file_bytes, fname, mime)
             return file_bytes, fname, now.strftime("%H:%M:%S")
-        return None, None, None
 
-    else:  # Kamera langsung
+    # ── Mode: Kamera langsung ─────────────────────────────────────────────────
+    else:
         foto = st.camera_input(
-            "Arahkan kamera ke nota, lalu tekan tombol capture",
+            "Arahkan kamera ke nota lalu tekan Capture",
             key="s1_kamera",
         )
         if foto is not None:
-            file_bytes      = foto.getvalue()
-            fname, now      = _build_filename("jpg")
+            file_bytes = foto.getvalue()
+            fname, now = _build_filename("jpg")
+
+            # Simpan ke session_state agar tahan rerun
+            st.session_state["foto_invoice_data"] = {
+                "bytes": file_bytes,
+                "fname": fname,
+                "jam":   now.strftime("%H:%M:%S"),
+                "mime":  "image/jpeg",
+            }
+
+            st.image(file_bytes, use_container_width=True)
             _upload_to_storage(file_bytes, fname, "image/jpeg")
-            st.image(file_bytes, caption=f"Preview: {fname}", use_column_width=True)
             return file_bytes, fname, now.strftime("%H:%M:%S")
-        return None, None, None
+
+    return None, None, None
 
 # ─── HELPER: HITUNG KADALUARSA OTOMATIS ─────────────────────────────────────────
 def hitung_kadaluarsa_otomatis(nama_barang: str, metode: str, tgl_beli: date):
@@ -1988,10 +2250,17 @@ def page_administrasi(df: pd.DataFrame):
                           help="Nama orang yang mencatat / melakukan transaksi ini")
 
         # Foto invoice — WAJIB
-        st.markdown('<p class="form-section-title">Foto Invoice — Wajib *</p>',
+        st.markdown('<p class="form-section-title">Bukti Invoice *</p>',
                     unsafe_allow_html=True)
-        st.caption("Satu foto untuk satu nota. Foto berlaku untuk semua item dalam nota yang sama.")
+        st.caption("Satu lampiran per nota. Berlaku untuk semua item dalam nota yang sama.")
         _foto_bytes, _nama_foto, _jam_foto = render_foto_invoice()
+
+        # Fallback: baca dari session_state jika render_foto_invoice return None
+        # (terjadi saat foto sudah ada di state tapi widget sedang ditampilkan ulang)
+        if _foto_bytes is None and st.session_state.get("foto_invoice_data"):
+            _d = st.session_state["foto_invoice_data"]
+            _foto_bytes, _nama_foto, _jam_foto = _d["bytes"], _d["fname"], _d["jam"]
+
         if _foto_bytes is None:
             st.warning("Bukti invoice belum dilampirkan. Lampirkan sebelum menyimpan.")
 
@@ -2042,6 +2311,8 @@ def page_administrasi(df: pd.DataFrame):
                         if berhasil == len(keranjang):
                             st.success(f"{berhasil} item dari nota {nota_val or '-'} berhasil disimpan.")
                             st.session_state["item_keranjang"] = []
+                            # Reset foto state agar nota berikutnya mulai bersih
+                            st.session_state["foto_invoice_data"] = None
                             st.balloons()
                             st.rerun()
                         else:
@@ -2321,6 +2592,8 @@ def page_administrasi(df: pd.DataFrame):
                 })
                 if ok:
                     st.success(f"Transaksi {nama_val} dari {sup_val} berhasil disimpan.")
+                    # Reset foto state agar nota berikutnya mulai bersih
+                    st.session_state["foto_invoice_data"] = None
                     st.balloons()
 
     # ═══════════════════════════════════════════════════════════════════════════
@@ -2334,7 +2607,7 @@ def page_administrasi(df: pd.DataFrame):
             # ── Filter bar ────────────────────────────────────────────────────
             rf1, rf2, rf3, rf4, rf5 = st.columns(5)
             with rf1:
-                cari    = st.text_input("🔍 Cari barang / supplier", key="r_cari")
+                cari    = st.text_input("Cari barang / supplier", key="r_cari")
             with rf2:
                 fil_kat = st.selectbox("Kategori", ["Semua"] + KATEGORI_OPTIONS, key="r_kat")
             with rf3:
@@ -2369,56 +2642,223 @@ def page_administrasi(df: pd.DataFrame):
             # ── Mode tampilan ─────────────────────────────────────────────────
             view_mode = st.radio(
                 "Mode Tampilan",
-                ["📋 Detail per Item", "🧾 Summary per Nota"],
+                ["Detail per Item", "Summary per Nota"],
                 horizontal=True, key="r_view_mode"
             )
             st.divider()
 
-            if view_mode == "🧾 Summary per Nota":
-                if "no_nota" in urut.columns:
-                    urut["harga_total_num"] = pd.to_numeric(urut.get("harga_total", urut.get("total_harga", 0)), errors="coerce").fillna(0)
-                    agg_dict = {
-                        "supplier":     ("supplier", "first"),
-                        "tanggal":      ("tanggal",  "first"),
-                        "nama_pencatat":("nama_pencatat", "first") if "nama_pencatat" in urut.columns else ("supplier","first"),
-                        "jumlah_item":  ("nama_barang", "count"),
-                        "daftar_barang":("nama_barang", lambda x: " · ".join(x.dropna().unique()[:6])
-                                         + ("…" if x.nunique() > 6 else "")),
-                        "total_nota":   ("harga_total_num", "sum"),
-                        "status":       ("status_pembayaran", lambda x: "✅ Lunas" if (x == "Lunas").all()
-                                         else "⚠️ Ada Hutang"),
-                    }
-                    summary = (urut.groupby("no_nota", dropna=False)
-                               .agg(**{k: v for k,v in agg_dict.items()})
-                               .reset_index()
-                               .sort_values("tanggal", ascending=False))
-                    summary.columns = ["No. Nota","Supplier","Tanggal","Pencatat",
-                                       "Jml Item","Daftar Barang","Total (Rp)","Status"]
-                    summary["Total (Rp)"] = summary["Total (Rp)"].apply(lambda x: f"Rp {x:,.0f}")
-                    st.dataframe(summary, use_container_width=True, hide_index=True)
-                    st.caption(f"**{len(summary)} nota** dari filter yang aktif")
-                else:
-                    st.info("Kolom no_nota tidak tersedia.")
-
-            else:  # Detail per item
+            # ══════════════════════════════════════════════════════════════════
+            # MODE 1 — DETAIL PER ITEM
+            # Layout: tabel kiri (lebar) + panel foto kanan (sempit)
+            # Pengguna pilih baris via selectbox, foto & aksi muncul di panel kanan
+            # ══════════════════════════════════════════════════════════════════
+            if view_mode == "Detail per Item":
                 col_priority = [
-                    "tanggal", "jam_transaksi", "no_nota", "supplier", "nama_pencatat",
-                    "kategori", "sub_kategori", "nama_barang", "merk", "grind_size",
-                    "qty", "uom_qty", "vol_per_unit", "uom_vol", "netto_total",
-                    "harga_total", "total_harga",
-                    "tgl_kadaluarsa",
-                    "status_pembayaran", "catatan",
+                    "tanggal", "no_nota", "supplier", "nama_pencatat",
+                    "kategori", "nama_barang", "merk",
+                    "qty", "uom_qty", "harga_total", "total_harga",
+                    "tgl_kadaluarsa", "status_pembayaran",
                 ]
                 cols_show = [c for c in col_priority if c in urut.columns]
-                st.dataframe(urut[cols_show], use_container_width=True, hide_index=True)
 
-                total_f = pd.to_numeric(
-                    hasil.get(col_harga_r, pd.Series(dtype=float)), errors="coerce"
-                ).sum()
-                st.caption(f"**{len(hasil)} item** ditampilkan · Total: **Rp {total_f:,.0f}**")
+                # Split layout: tabel kiri 65%, panel foto kanan 35%
+                col_tabel, col_foto_panel = st.columns([65, 35], gap="medium")
+
+                with col_tabel:
+                    st.markdown(
+                        f"<div style='font-size:0.7rem;font-weight:700;"
+                        f"text-transform:uppercase;letter-spacing:0.08em;"
+                        f"color:#94a3b8;margin-bottom:6px;'>"
+                        f"{len(urut)} item ditemukan</div>",
+                        unsafe_allow_html=True,
+                    )
+                    st.dataframe(urut[cols_show], use_container_width=True,
+                                 hide_index=True)
+
+                    total_f = pd.to_numeric(
+                        hasil.get(col_harga_r, pd.Series(dtype=float)),
+                        errors="coerce"
+                    ).sum()
+                    st.caption(f"Total: Rp {total_f:,.0f}")
+
+                with col_foto_panel:
+                    st.markdown(
+                        "<div style='font-size:0.7rem;font-weight:700;"
+                        "text-transform:uppercase;letter-spacing:0.08em;"
+                        "color:#94a3b8;margin-bottom:6px;'>Bukti Invoice</div>",
+                        unsafe_allow_html=True,
+                    )
+
+                    # Pilih baris via selectbox — tampilkan nota + nama barang
+                    if "id" in urut.columns and len(urut) > 0:
+                        def _fmt_row(row_id):
+                            r = urut[urut["id"] == row_id]
+                            if r.empty: return str(row_id)
+                            rv = r.iloc[0]
+                            nb = rv.get("nama_barang", "-")
+                            tgl = rv.get("tanggal", "-")
+                            nota = rv.get("no_nota", "-")
+                            return f"{tgl} · {nota} · {nb}"
+
+                        pilih_id = st.selectbox(
+                            "Pilih transaksi",
+                            urut["id"].tolist(),
+                            format_func=_fmt_row,
+                            key="r_pilih_id",
+                            label_visibility="collapsed",
+                        )
+                        baris_foto = urut[urut["id"] == pilih_id]
+                        if not baris_foto.empty:
+                            r_foto = baris_foto.iloc[0]
+                            fname  = r_foto.get("foto_invoice", None)
+                            if fname and str(fname) in ("None", "nan", ""):
+                                fname = None
+
+                            # Info singkat transaksi
+                            st.markdown(
+                                f"<div style='background:#f8fafc;border:1px solid #e0e7ff;"
+                                f"border-radius:8px;padding:8px 12px;font-size:0.78rem;"
+                                f"color:#475569;margin-bottom:8px;'>"
+                                f"<b>{r_foto.get('nama_barang','-')}</b><br>"
+                                f"{r_foto.get('supplier','-')} · {r_foto.get('tanggal','-')}"
+                                f"</div>",
+                                unsafe_allow_html=True,
+                            )
+
+                            # Render foto + aksi
+                            render_foto_riwayat(
+                                row_id=pilih_id,
+                                fname=fname,
+                                key_prefix=str(pilih_id),
+                            )
+                    else:
+                        st.info("Pilih baris untuk melihat foto.")
+
+            # ══════════════════════════════════════════════════════════════════
+            # MODE 2 — SUMMARY PER NOTA
+            # Kartu per nota: info ringkasan + ekspander foto + aksi
+            # ══════════════════════════════════════════════════════════════════
+            else:
+                if "no_nota" not in urut.columns:
+                    st.info("Kolom no_nota tidak tersedia.")
+                else:
+                    urut["harga_total_num"] = pd.to_numeric(
+                        urut.get("harga_total", urut.get("total_harga", 0)),
+                        errors="coerce"
+                    ).fillna(0)
+
+                    # Agregasi per nota
+                    has_foto  = "foto_invoice" in urut.columns
+                    agg_d = {
+                        "supplier":      ("supplier",          "first"),
+                        "tanggal":       ("tanggal",           "first"),
+                        "pencatat":      ("nama_pencatat",     "first")
+                                          if "nama_pencatat" in urut.columns
+                                          else ("supplier",    "first"),
+                        "jml_item":      ("nama_barang",       "count"),
+                        "daftar_barang": ("nama_barang",       lambda x:
+                                          " · ".join(x.dropna().unique()[:5])
+                                          + ("…" if x.nunique() > 5 else "")),
+                        "total_nota":    ("harga_total_num",   "sum"),
+                        "status":        ("status_pembayaran", lambda x:
+                                          "Lunas" if (x == "Lunas").all() else "Ada Hutang"),
+                    }
+                    if has_foto:
+                        agg_d["foto"] = ("foto_invoice", "first")
+                    if "id" in urut.columns:
+                        agg_d["first_id"] = ("id", "first")
+
+                    summary = (
+                        urut.groupby("no_nota", dropna=False)
+                        .agg(**{k: v for k, v in agg_d.items()})
+                        .reset_index()
+                        .sort_values("tanggal", ascending=False)
+                    )
+
+                    st.caption(f"{len(summary)} nota dari filter aktif")
+
+                    for _, row_s in summary.iterrows():
+                        nota_id  = str(row_s.get("no_nota", "-") or "-")
+                        lunas    = row_s.get("status", "") == "Lunas"
+                        status_badge = (
+                            "<span style='background:#dcfce7;color:#166534;"
+                            "border-radius:4px;padding:1px 7px;font-size:0.7rem;"
+                            "font-weight:700;'>Lunas</span>"
+                            if lunas else
+                            "<span style='background:#fef9c3;color:#854d0e;"
+                            "border-radius:4px;padding:1px 7px;font-size:0.7rem;"
+                            "font-weight:700;'>Ada Hutang</span>"
+                        )
+                        fname_n = row_s.get("foto", None) if has_foto else None
+                        if fname_n and str(fname_n) in ("None", "nan", ""):
+                            fname_n = None
+                        foto_badge = (
+                            "<span style='background:#eef2ff;color:#4f46e5;"
+                            "border-radius:4px;padding:1px 7px;font-size:0.7rem;"
+                            "font-weight:700;margin-left:4px;'>Ada Foto</span>"
+                            if fname_n else
+                            "<span style='background:#f1f5f9;color:#94a3b8;"
+                            "border-radius:4px;padding:1px 7px;font-size:0.7rem;"
+                            "font-weight:600;margin-left:4px;'>No Foto</span>"
+                        )
+
+                        with st.expander(
+                            f"{row_s.get('tanggal','-')}  ·  {nota_id}  ·  "
+                            f"{row_s.get('supplier','-')}  ·  "
+                            f"Rp {row_s.get('total_nota',0):,.0f}",
+                            expanded=False,
+                        ):
+                            # Header nota
+                            st.markdown(
+                                f"{status_badge} {foto_badge} &nbsp; "
+                                f"<span style='font-size:0.78rem;color:#64748b;'>"
+                                f"{row_s.get('jml_item',0)} item · "
+                                f"Pencatat: {row_s.get('pencatat','-')}</span>",
+                                unsafe_allow_html=True,
+                            )
+                            st.markdown(
+                                f"<div style='font-size:0.8rem;color:#475569;"
+                                f"margin:4px 0 10px;'>{row_s.get('daftar_barang','-')}</div>",
+                                unsafe_allow_html=True,
+                            )
+
+                            # Panel foto di kanan, detail di kiri
+                            col_det, col_foto_s = st.columns([3, 2], gap="medium")
+
+                            with col_det:
+                                # Tabel item dalam nota ini
+                                items_nota = urut[
+                                    urut["no_nota"].astype(str) == nota_id
+                                ]
+                                show_c = [c for c in [
+                                    "nama_barang","merk","qty","uom_qty",
+                                    "harga_total","tgl_kadaluarsa","status_pembayaran"
+                                ] if c in items_nota.columns]
+                                st.dataframe(
+                                    items_nota[show_c],
+                                    use_container_width=True,
+                                    hide_index=True,
+                                )
+
+                            with col_foto_s:
+                                st.markdown(
+                                    "<div style='font-size:0.7rem;font-weight:700;"
+                                    "text-transform:uppercase;letter-spacing:0.08em;"
+                                    "color:#94a3b8;margin-bottom:6px;'>Bukti Invoice</div>",
+                                    unsafe_allow_html=True,
+                                )
+                                first_id = row_s.get("first_id", None)
+                                if first_id is not None:
+                                    render_foto_riwayat(
+                                        row_id=first_id,
+                                        fname=fname_n,
+                                        key_prefix=f"nota_{nota_id}",
+                                    )
+                                else:
+                                    st.info("ID tidak tersedia.")
 
             # ── Export ────────────────────────────────────────────────────────
-            if st.session_state.role == "manager" and not hasil.empty:
+            if st.session_state.role in ("manager", "manager_pusat") and not hasil.empty:
                 st.divider()
                 csv_data = hasil.to_csv(index=False).encode("utf-8")
                 st.download_button(
