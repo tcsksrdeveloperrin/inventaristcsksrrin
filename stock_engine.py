@@ -21,8 +21,11 @@ Tiga tabel baru di Supabase inventaris (TIDAK menyentuh DB POS):
 from __future__ import annotations
 import json
 import re
-from datetime import date, datetime, timedelta
+from datetime import date, datetime, timedelta, timezone
 from typing import Optional
+
+_WIB = timezone(timedelta(hours=7))
+def _now_wib(): return datetime.now(timezone.utc).astimezone(_WIB)
 
 import pandas as pd
 import streamlit as st
@@ -207,6 +210,74 @@ def get_pos_client():
         return None
 
 
+def ensure_tables(supabase_inv) -> bool:
+    """
+    Buat tabel yang dibutuhkan jika belum ada.
+    Dipanggil sekali tiap sesi. Return True jika berhasil.
+    
+    Karena Supabase REST API tidak support raw DDL langsung,
+    kita pakai pendekatan 'probe then seed':
+      1. Coba SELECT dari tabel → jika error PGRST205, tabel belum ada
+      2. Tampilkan SQL DDL untuk dijalankan manual di SQL Editor
+      3. Sambil menunggu, gunakan session_state sebagai fallback lokal
+    """
+    if not supabase_inv:
+        return False
+    
+    # Cek apakah sudah pernah di-probe sesi ini
+    if st.session_state.get("_tables_checked"):
+        return st.session_state.get("_tables_ok", False)
+    
+    tables_needed = [
+        "product_ingredient_groups",
+        "stock_opname",
+        "reorder_config",
+        "inventory_usage_log",
+    ]
+    
+    missing = []
+    for tbl in tables_needed:
+        try:
+            supabase_inv.table(tbl).select("id").limit(1).execute()
+        except Exception as e:
+            err_msg = str(e)
+            if "PGRST205" in err_msg or "schema cache" in err_msg or "relation" in err_msg:
+                missing.append(tbl)
+    
+    st.session_state["_tables_checked"] = True
+    
+    if missing:
+        st.session_state["_tables_ok"] = False
+        st.error(
+            f"**Tabel database belum dibuat:** `{'`, `'.join(missing)}`  \n\n"
+            "Jalankan SQL berikut di **SQL Editor Supabase** project inventaris kamu, "
+            "lalu refresh halaman ini."
+        )
+        with st.expander("Lihat SQL yang perlu dijalankan", expanded=True):
+            st.code(SUPABASE_DDL, language="sql")
+        return False
+    
+    st.session_state["_tables_ok"] = True
+    
+    # Seed initial mapping jika tabel kosong
+    try:
+        res = supabase_inv.table("product_ingredient_groups").select("id").limit(1).execute()
+        if not res.data:
+            # Tabel kosong — seed dengan INITIAL_MAPPING
+            supabase_inv.table("product_ingredient_groups").insert(
+                [{"product_id": r["product_id"],
+                  "product_name": r["product_name"],
+                  "branch": r["branch"],
+                  "bahan_baku": r["bahan_baku"],
+                  "active": True}
+                 for r in INITIAL_MAPPING]
+            ).execute()
+    except Exception:
+        pass  # Gagal seed tidak fatal
+    
+    return True
+
+
 def fetch_pos_transactions(branch: str, since: datetime) -> pd.DataFrame:
     """
     Ambil transaksi baru dari DB POS sejak `since`.
@@ -267,7 +338,7 @@ def get_mapping(supabase_inv, branch: str) -> dict[str, list[str]]:
 def get_last_sync_time(supabase_inv, branch: str) -> datetime:
     """Ambil waktu transaksi terakhir yang sudah di-sync."""
     if not supabase_inv:
-        return datetime.now() - timedelta(days=7)
+        return _now_wib() - timedelta(days=7)
     try:
         res = (supabase_inv.table("inventory_usage_log")
                .select("created_at")
@@ -280,7 +351,7 @@ def get_last_sync_time(supabase_inv, branch: str) -> datetime:
             return datetime.fromisoformat(ts.replace("Z", "+00:00"))
     except Exception:
         pass
-    return datetime.now() - timedelta(days=30)
+    return _now_wib() - timedelta(days=30)
 
 
 def sync_pos_to_inventory(supabase_inv, branch: str) -> dict:
@@ -628,7 +699,7 @@ def compute_reorder_alerts(supabase_inv, supabase_invent, branch: str) -> pd.Dat
             pass
 
     # Usage 7 hari terakhir untuk avg harian
-    cutoff_7d = (datetime.now() - timedelta(days=7)).date().isoformat()
+    cutoff_7d = (_now_wib() - timedelta(days=7)).date().isoformat()
     usage_7d = {}
     if supabase_inv:
         try:
@@ -729,17 +800,52 @@ def page_stock_tracker(supabase_inv, cabang: str):
     import numpy as np
 
     st.title("Stok Real-Time")
+    
+    # Pastikan tabel ada — jika belum, tampilkan DDL dan hentikan
+    if not ensure_tables(supabase_inv):
+        st.info(
+            "Setelah menjalankan SQL di atas, refresh halaman ini. "
+            "Sementara itu, fitur mapping bawaan tetap tersedia."
+        )
+        # Tetap tampilkan mapping bawaan meski tabel belum ada
+        st.divider()
+        st.subheader("Mapping Produk Bawaan (sementara)")
+        import pandas as pd
+        df_init = pd.DataFrame(
+            [r for r in INITIAL_MAPPING if r["branch"] == cabang]
+        )
+        if not df_init.empty:
+            st.dataframe(df_init[["product_name","bahan_baku"]],
+                         use_container_width=True, hide_index=True)
+        return
+
     st.caption(
         f"Cabang {cabang}  ·  Sinkron otomatis dari POS  ·  "
-        f"{datetime.now().strftime('%d %b %Y, %H:%M')}"
+        f"{_now_wib().strftime('%d %b %Y, %H:%M')}"
     )
 
-    # Tombol sync manual di atas
-    col_sync, col_info = st.columns([1, 4])
+    # ── Auto-sync saat halaman dibuka (ambil semua transaksi baru) ──────────
+    _sync_key = f"_stock_synced_{cabang}"
+    if not st.session_state.get(_sync_key):
+        with st.spinner("Sinkronisasi awal dari POS..."):
+            _r = sync_pos_to_inventory(supabase_inv, cabang)
+        st.session_state[_sync_key] = True
+        if _r["synced"] > 0:
+            st.toast(
+                f"Sinkronisasi: {_r['new_trx']} transaksi baru, "
+                f"{_r['synced']} entri ditambahkan.",
+                icon="✓"
+            )
+
+    # ── Tombol sync manual + info ─────────────────────────────────────────────
+    col_sync, col_auto, col_info = st.columns([1, 1, 3])
     with col_sync:
-        if st.button("Sinkron POS Sekarang", type="primary", use_container_width=True):
+        if st.button("Sinkron Sekarang", type="primary", use_container_width=True):
+            # Reset flag agar sync ulang
+            st.session_state.pop(_sync_key, None)
             with st.spinner("Mengambil transaksi baru dari POS..."):
                 result = sync_pos_to_inventory(supabase_inv, cabang)
+            st.session_state[_sync_key] = True
             if result["new_trx"] == 0:
                 st.info("Tidak ada transaksi baru sejak sinkronisasi terakhir.")
             else:
@@ -748,12 +854,30 @@ def page_stock_tracker(supabase_inv, cabang: str):
                     f"{result['synced']} entri usage log ditambahkan  ·  "
                     f"{len(result['bahan_terdampak'])} bahan terdampak"
                 )
+    with col_auto:
+        # Auto-refresh setiap N menit
+        interval = st.selectbox(
+            "Auto-refresh",
+            ["Tidak", "5 menit", "10 menit", "30 menit"],
+            key="auto_refresh_interval",
+            label_visibility="collapsed",
+        )
+        if interval != "Tidak":
+            menit = int(interval.split()[0])
+            # Inject JS auto-reload
+            st.markdown(
+                f"<script>setTimeout(function(){{window.location.reload();}}, "
+                f"{menit * 60 * 1000});</script>",
+                unsafe_allow_html=True,
+            )
+            st.caption(f"Refresh otomatis {interval}")
+
     with col_info:
         last_sync = get_last_sync_time(supabase_inv, cabang)
         st.caption(
-            f"Sinkronisasi terakhir: **{last_sync.strftime('%d %b %Y %H:%M')}**  ·  "
-            "Klik 'Sinkron POS Sekarang' untuk update manual. "
-            "Atau pasang Supabase Webhook di POS untuk sinkron otomatis tiap transaksi."
+            f"Sinkronisasi terakhir: **{last_sync.strftime('%d %b %Y %H:%M WIB')}**  ·  "
+            "Data stok diperbarui otomatis tiap kali halaman ini dibuka atau "
+            "tombol Sinkron diklik."
         )
 
     st.divider()
