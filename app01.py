@@ -1,6 +1,13 @@
 import streamlit as st
 import pandas as pd
 from datetime import date, datetime
+import sys, os
+sys.path.insert(0, os.path.dirname(__file__))
+try:
+    from stock_engine import page_stock_tracker, sync_pos_to_inventory
+    STOCK_ENGINE_AVAILABLE = True
+except ImportError:
+    STOCK_ENGINE_AVAILABLE = False
 
 # ─── PAGE CONFIG ─────────────────────────────────────────────────────────────────
 st.set_page_config(
@@ -1488,6 +1495,7 @@ def show_sidebar():
                 "Dashboard",
                 "Administrasi",
                 "Kontrol & Audit",
+                "Stok Real-Time",
             ]
 
         page = st.radio("", pages, label_visibility="collapsed")
@@ -1695,6 +1703,20 @@ def page_dashboard(df: pd.DataFrame, cabang_label: str = None):
     now_str = datetime.now().strftime("%A, %d %B %Y · %H:%M")
     st.title("Dashboard Inventaris")
     st.caption(f"Cabang **{cabang}** · {now_str}")
+
+    # ── Auto-sync POS di background saat dashboard dibuka ──────────────────
+    if STOCK_ENGINE_AVAILABLE and not st.session_state.get("_pos_synced_this_session"):
+        try:
+            _sync_result = sync_pos_to_inventory(supabase, cabang)
+            if _sync_result["synced"] > 0:
+                st.toast(
+                    f"Sinkronisasi POS: {_sync_result['synced']} entri baru "
+                    f"dari {_sync_result['new_trx']} transaksi.",
+                    icon="🔄"
+                )
+            st.session_state["_pos_synced_this_session"] = True
+        except Exception:
+            pass  # Gagal sync tidak boleh break dashboard
 
     if df.empty:
         empty_state("Belum Ada Data",
@@ -3640,6 +3662,11 @@ def main():
     if   page == "Dashboard":        page_dashboard(df)
     elif page == "Administrasi":     page_administrasi(df)
     elif page == "Kontrol & Audit":  page_kontrol_audit(df)
+    elif page == "Stok Real-Time":
+        if STOCK_ENGINE_AVAILABLE:
+            page_stock_tracker(supabase, st.session_state.cabang)
+        else:
+            st.error("Modul stock_engine.py tidak ditemukan. Pastikan file ada di folder yang sama.")
 
 if __name__ == "__main__":
     main()
