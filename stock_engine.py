@@ -790,32 +790,20 @@ def compute_reorder_alerts(supabase_inv, supabase_invent, branch: str) -> pd.Dat
 
 def page_stock_tracker(supabase_inv, cabang: str):
     """
-    Halaman utama modul Stock Tracker.
-    Tab 1: Reorder Alert Dashboard (auto-refresh)
-    Tab 2: Sinkronisasi POS
-    Tab 3: Stock Opname
-    Tab 4: Mapping Produk → Bahan Baku
-    Tab 5: Konfigurasi Reorder
+    Halaman Stok Real-Time.
+    Semua logika submit form berada DI DALAM blok with st.form()
+    untuk menghindari UnboundLocalError saat tab lain aktif.
     """
-    import numpy as np
-
     st.title("Stok Real-Time")
-    
-    # Pastikan tabel ada — jika belum, tampilkan DDL dan hentikan
+
+    # ── Cek tabel dulu ────────────────────────────────────────────────────────
     if not ensure_tables(supabase_inv):
-        st.info(
-            "Setelah menjalankan SQL di atas, refresh halaman ini. "
-            "Sementara itu, fitur mapping bawaan tetap tersedia."
-        )
-        # Tetap tampilkan mapping bawaan meski tabel belum ada
+        st.info("Setelah menjalankan SQL di atas, refresh halaman ini.")
         st.divider()
         st.subheader("Mapping Produk Bawaan (sementara)")
-        import pandas as pd
-        df_init = pd.DataFrame(
-            [r for r in INITIAL_MAPPING if r["branch"] == cabang]
-        )
+        df_init = pd.DataFrame([r for r in INITIAL_MAPPING if r["branch"] == cabang])
         if not df_init.empty:
-            st.dataframe(df_init[["product_name","bahan_baku"]],
+            st.dataframe(df_init[["product_name", "bahan_baku"]],
                          use_container_width=True, hide_index=True)
         return
 
@@ -824,38 +812,36 @@ def page_stock_tracker(supabase_inv, cabang: str):
         f"{_now_wib().strftime('%d %b %Y, %H:%M')}"
     )
 
-    # ── Auto-sync saat halaman dibuka (ambil semua transaksi baru) ──────────
+    # ── Auto-sync throttled (max 1x per 5 menit) ─────────────────────────────
     _sync_key = f"_stock_synced_{cabang}"
-    if not st.session_state.get(_sync_key):
-        with st.spinner("Sinkronisasi awal dari POS..."):
+    _sync_ts  = f"_stock_synced_ts_{cabang}"
+    _now_ts   = datetime.now().timestamp()
+    if not st.session_state.get(_sync_key) or (_now_ts - st.session_state.get(_sync_ts, 0)) > 300:
+        with st.spinner("Sinkronisasi dari POS..."):
             _r = sync_pos_to_inventory(supabase_inv, cabang)
         st.session_state[_sync_key] = True
-        if _r["synced"] > 0:
-            st.toast(
-                f"Sinkronisasi: {_r['new_trx']} transaksi baru, "
-                f"{_r['synced']} entri ditambahkan.",
-                icon="✓"
-            )
+        st.session_state[_sync_ts]  = _now_ts
+        if _r.get("synced", 0) > 0:
+            st.toast(f"POS: {_r['new_trx']} transaksi baru disinkronkan.", icon="✓")
 
-    # ── Tombol sync manual + info ─────────────────────────────────────────────
+    # ── Toolbar ───────────────────────────────────────────────────────────────
     col_sync, col_auto, col_info = st.columns([1, 1, 3])
     with col_sync:
         if st.button("Sinkron Sekarang", type="primary", use_container_width=True):
-            # Reset flag agar sync ulang
             st.session_state.pop(_sync_key, None)
             with st.spinner("Mengambil transaksi baru dari POS..."):
                 result = sync_pos_to_inventory(supabase_inv, cabang)
             st.session_state[_sync_key] = True
+            st.session_state[_sync_ts]  = datetime.now().timestamp()
             if result["new_trx"] == 0:
-                st.info("Tidak ada transaksi baru sejak sinkronisasi terakhir.")
+                st.info("Tidak ada transaksi baru.")
             else:
                 st.success(
-                    f"{result['new_trx']} transaksi baru  ·  "
-                    f"{result['synced']} entri usage log ditambahkan  ·  "
+                    f"{result['new_trx']} transaksi · "
+                    f"{result['synced']} entri ditambahkan · "
                     f"{len(result['bahan_terdampak'])} bahan terdampak"
                 )
     with col_auto:
-        # Auto-refresh setiap N menit
         interval = st.selectbox(
             "Auto-refresh",
             ["Tidak", "5 menit", "10 menit", "30 menit"],
@@ -864,20 +850,17 @@ def page_stock_tracker(supabase_inv, cabang: str):
         )
         if interval != "Tidak":
             menit = int(interval.split()[0])
-            # Inject JS auto-reload
             st.markdown(
-                f"<script>setTimeout(function(){{window.location.reload();}}, "
+                f"<script>setTimeout(function(){{window.location.reload();}},"
                 f"{menit * 60 * 1000});</script>",
                 unsafe_allow_html=True,
             )
-            st.caption(f"Refresh otomatis {interval}")
-
+            st.caption(f"↻ {interval}")
     with col_info:
         last_sync = get_last_sync_time(supabase_inv, cabang)
         st.caption(
-            f"Sinkronisasi terakhir: **{last_sync.strftime('%d %b %Y %H:%M WIB')}**  ·  "
-            "Data stok diperbarui otomatis tiap kali halaman ini dibuka atau "
-            "tombol Sinkron diklik."
+            f"Sinkronisasi terakhir: **{last_sync.strftime('%d %b %Y %H:%M')} WIB**  ·  "
+            "Data diperbarui otomatis tiap halaman dibuka atau tombol Sinkron diklik."
         )
 
     st.divider()
@@ -890,84 +873,78 @@ def page_stock_tracker(supabase_inv, cabang: str):
         "Konfigurasi Reorder",
     ])
 
-    # ── TAB 1: REORDER ALERT ─────────────────────────────────────────────────
+    # ══════════════════════════════════════════════════════════════════════════
+    # TAB 1 — REORDER ALERT
+    # ══════════════════════════════════════════════════════════════════════════
     with tab_alert:
-        st.markdown('<div class="section-header">STATUS STOK ESTIMASI REAL-TIME</div>',
-                    unsafe_allow_html=True)
-
+        st.markdown("**STATUS STOK ESTIMASI REAL-TIME**")
         with st.spinner("Menghitung stok estimasi..."):
             df_alert = compute_reorder_alerts(supabase_inv, supabase_inv, cabang)
 
         if df_alert.empty:
             st.info(
                 "Belum ada data cukup untuk menghitung reorder alert.  \n"
-                "Langkah pertama: lakukan Sinkronisasi POS, lalu input Stock Opname "
+                "Langkah: lakukan Sinkronisasi POS, lalu input Stock Opname "
                 "minimal satu kali di tab 'Stock Opname'."
             )
         else:
-            # Ringkasan KPI
-            n_habis    = len(df_alert[df_alert["Status"] == "HABIS"])
-            n_reorder  = len(df_alert[df_alert["Status"] == "REORDER"])
-            n_perhatian= len(df_alert[df_alert["Status"] == "PERHATIAN"])
-            n_aman     = len(df_alert[df_alert["Status"] == "AMAN"])
+            n_habis     = (df_alert["Status"] == "HABIS").sum()
+            n_reorder   = (df_alert["Status"] == "REORDER").sum()
+            n_perhatian = (df_alert["Status"] == "PERHATIAN").sum()
+            n_aman      = (df_alert["Status"] == "AMAN").sum()
 
             c1, c2, c3, c4 = st.columns(4)
-            def _kpi(col, label, val, theme):
+            for col, label, val, theme in [
+                (c1, "HABIS",     f"{n_habis} bahan",     "kpi-danger"  if n_habis     else "kpi-success"),
+                (c2, "REORDER",   f"{n_reorder} bahan",   "kpi-warning" if n_reorder   else "kpi-success"),
+                (c3, "PERHATIAN", f"{n_perhatian} bahan", "kpi-warning" if n_perhatian else "kpi-success"),
+                (c4, "AMAN",      f"{n_aman} bahan",      "kpi-success"),
+            ]:
                 col.markdown(
-                    f'<div class="kpi-card {theme}">'
-                    f'<div class="kpi-accent"></div>'
+                    f'<div class="kpi-card {theme}"><div class="kpi-accent"></div>'
                     f'<div class="kpi-label">{label}</div>'
-                    f'<div class="kpi-value">{val}</div>'
-                    f'</div>', unsafe_allow_html=True)
-
-            _kpi(c1, "HABIS", f"{n_habis} bahan",     "kpi-danger"  if n_habis    else "kpi-success")
-            _kpi(c2, "REORDER", f"{n_reorder} bahan", "kpi-warning" if n_reorder  else "kpi-success")
-            _kpi(c3, "PERHATIAN", f"{n_perhatian} bahan", "kpi-warning" if n_perhatian else "kpi-success")
-            _kpi(c4, "AMAN", f"{n_aman} bahan", "kpi-success")
+                    f'<div class="kpi-value">{val}</div></div>',
+                    unsafe_allow_html=True,
+                )
 
             st.divider()
-
-            # Tabel alert — hanya tampilkan yang bukan AMAN dulu
             filter_status = st.radio(
-                "Filter status",
-                ["Semua", "Butuh Tindakan (Habis + Reorder)", "Aman saja"],
-                horizontal=True, key="alert_filter"
+                "Filter",
+                ["Semua", "Butuh Tindakan", "Aman"],
+                horizontal=True, key="alert_filter",
             )
-
             df_show = df_alert.copy()
-            if filter_status == "Butuh Tindakan (Habis + Reorder)":
+            if filter_status == "Butuh Tindakan":
                 df_show = df_show[df_show["Status"].isin(["HABIS", "REORDER", "PERHATIAN"])]
-            elif filter_status == "Aman saja":
+            elif filter_status == "Aman":
                 df_show = df_show[df_show["Status"] == "AMAN"]
 
-            display_cols = ["Bahan Baku", "Stok Estimasi", "Satuan",
-                            "Avg Pakai/Hari", "Reorder Point", "Hari Tersisa", "Status"]
-            display_cols = [c for c in display_cols if c in df_show.columns]
-
+            show_cols = [c for c in
+                         ["Bahan Baku","Stok Estimasi","Satuan","Avg Pakai/Hari",
+                          "Reorder Point","Hari Tersisa","Status"]
+                         if c in df_show.columns]
             st.dataframe(
-                df_show[display_cols].sort_values(
+                df_show[show_cols].sort_values(
                     "Status",
-                    key=lambda s: s.map({"HABIS": 0, "REORDER": 1, "PERHATIAN": 2, "AMAN": 3})
+                    key=lambda s: s.map({"HABIS":0,"REORDER":1,"PERHATIAN":2,"AMAN":3})
                 ),
-                use_container_width=True,
-                hide_index=True,
+                use_container_width=True, hide_index=True,
             )
-
             st.caption(
-                "Catatan: Stok estimasi dihitung dari stok masuk (inventaris) dikurangi "
-                "estimasi pemakaian (usage log POS × koefisien). Akurasi meningkat seiring "
-                "bertambahnya data opname dan histori transaksi."
+                "Stok estimasi = stok masuk − estimasi pemakaian (usage log × koefisien). "
+                "Akurasi meningkat seiring bertambahnya data opname."
             )
 
-    # ── TAB 2: LOG SINKRONISASI ───────────────────────────────────────────────
+    # ══════════════════════════════════════════════════════════════════════════
+    # TAB 2 — LOG SINKRONISASI
+    # ══════════════════════════════════════════════════════════════════════════
     with tab_sync:
         st.subheader("Log Pemakaian dari POS")
-
         usage_rows = []
         if supabase_inv:
             try:
                 res = (supabase_inv.table("inventory_usage_log")
-                       .select("tanggal, product_name, bahan_baku, qty_terjual, cabang")
+                       .select("tanggal,product_name,bahan_baku,qty_terjual,cabang")
                        .eq("cabang", cabang)
                        .order("tanggal", desc=True)
                        .limit(200)
@@ -980,13 +957,14 @@ def page_stock_tracker(supabase_inv, cabang: str):
                           if r.get("cabang") == cabang]
 
         if usage_rows:
-            df_log = pd.DataFrame(usage_rows)
-            st.dataframe(df_log, use_container_width=True, hide_index=True)
-            st.caption(f"{len(df_log)} entri usage log ditampilkan")
+            st.dataframe(pd.DataFrame(usage_rows), use_container_width=True, hide_index=True)
+            st.caption(f"{len(usage_rows)} entri ditampilkan")
         else:
-            st.info("Belum ada log sinkronisasi. Klik 'Sinkron POS Sekarang' di atas.")
+            st.info("Belum ada log sinkronisasi. Klik 'Sinkron Sekarang' di atas.")
 
-    # ── TAB 3: STOCK OPNAME ───────────────────────────────────────────────────
+    # ══════════════════════════════════════════════════════════════════════════
+    # TAB 3 — STOCK OPNAME
+    # ══════════════════════════════════════════════════════════════════════════
     with tab_opname:
         st.subheader("Input Stock Opname")
         st.caption(
@@ -994,81 +972,77 @@ def page_stock_tracker(supabase_inv, cabang: str):
             "Data ini digunakan untuk menghitung koefisien pemakaian aktual."
         )
 
-        # Form input
-        with st.form("form_opname"):
-            col_tgl, col_pencatat = st.columns(2)
-            with col_tgl:
-                tgl_opname = st.date_input("Tanggal opname", value=date.today())
-            with col_pencatat:
-                pencatat = st.text_input("Nama pencatat", placeholder="Nama kasir/manager")
+        # Ambil daftar bahan SEBELUM masuk form
+        bahan_list_inv = []
+        if supabase_inv:
+            try:
+                res = (supabase_inv.table("transaksi")
+                       .select("nama_barang, uom_qty")
+                       .eq("cabang", cabang)
+                       .execute())
+                seen = set()
+                for r in (res.data or []):
+                    nm = r.get("nama_barang", "")
+                    if nm and nm not in seen:
+                        bahan_list_inv.append({"nama_barang": nm,
+                                               "uom_qty": r.get("uom_qty","unit")})
+                        seen.add(nm)
+            except Exception:
+                pass
 
-            st.markdown("**Isi stok fisik tiap bahan (kosongkan jika tidak dihitung):**")
-
-            # Ambil daftar bahan dari transaksi inventaris
-            bahan_list_inv = []
-            if supabase_inv:
-                try:
-                    res = (supabase_inv.table("transaksi")
-                           .select("nama_barang, uom_qty")
-                           .eq("cabang", cabang)
-                           .execute())
-                    seen = set()
-                    for r in (res.data or []):
-                        if r["nama_barang"] not in seen:
-                            bahan_list_inv.append(r)
-                            seen.add(r["nama_barang"])
-                except Exception:
-                    pass
-
-            if not bahan_list_inv:
-                st.warning("Tidak ada data bahan baku inventaris. Catat pembelian dulu.")
-            else:
+        if not bahan_list_inv:
+            st.warning("Tidak ada data bahan baku inventaris. "
+                       "Catat pembelian dulu di halaman Administrasi.")
+        else:
+            # SEMUA logika form + submit di DALAM with st.form
+            with st.form("form_opname", clear_on_submit=False):
+                _c1, _c2 = st.columns(2)
+                with _c1:
+                    tgl_opname = st.date_input("Tanggal opname", value=date.today())
+                with _c2:
+                    pencatat = st.text_input("Nama pencatat",
+                                             placeholder="Nama kasir/manager")
+                st.markdown("**Isi stok fisik tiap bahan (kosongkan jika tidak dihitung):**")
                 opname_inputs = {}
-                cols = st.columns(3)
-                for i, b in enumerate(bahan_list_inv):
-                    with cols[i % 3]:
-                        val = st.number_input(
-                            b["nama_barang"],
+                _cols = st.columns(3)
+                for _i, _b in enumerate(bahan_list_inv):
+                    with _cols[_i % 3]:
+                        _val = st.number_input(
+                            _b["nama_barang"],
                             min_value=0.0, step=0.5, format="%.2f",
-                            key=f"opname_{b['nama_barang']}",
-                            label_visibility="visible",
+                            key=f"opname_{_b['nama_barang']}",
                         )
-                        opname_inputs[b["nama_barang"]] = {
-                            "nilai": val, "satuan": b.get("uom_qty", "unit")}
+                        opname_inputs[_b["nama_barang"]] = {
+                            "nilai": _val, "satuan": _b.get("uom_qty","unit")
+                        }
+                catatan       = st.text_area("Catatan", height=60)
+                submit_opname = st.form_submit_button("Simpan Opname", type="primary")
 
-            catatan = st.text_area("Catatan", height=60)
-            submit_opname = st.form_submit_button("Simpan Opname", type="primary")
+                if submit_opname:
+                    rows_to_save = [
+                        {"cabang": cabang, "nama_barang": bahan,
+                         "stok_fisik": vals["nilai"], "satuan": vals["satuan"],
+                         "tanggal": tgl_opname.isoformat(), "pencatat": pencatat,
+                         "catatan": catatan or None}
+                        for bahan, vals in opname_inputs.items()
+                        if vals["nilai"] > 0
+                    ]
+                    if rows_to_save:
+                        if supabase_inv:
+                            try:
+                                supabase_inv.table("stock_opname").insert(rows_to_save).execute()
+                                st.success(f"Opname {len(rows_to_save)} bahan tersimpan.")
+                                st.rerun()
+                            except Exception as e:
+                                st.error(f"Gagal simpan opname: {e}")
+                        else:
+                            _ex = st.session_state.get("opname_local", [])
+                            _ex.extend(rows_to_save)
+                            st.session_state["opname_local"] = _ex
+                            st.success(f"Opname {len(rows_to_save)} bahan tersimpan (lokal).")
+                    else:
+                        st.warning("Isi minimal satu nilai > 0.")
 
-        if submit_opname:
-            rows_to_save = [
-                {
-                    "cabang":     cabang,
-                    "nama_barang": bahan,
-                    "stok_fisik":  vals["nilai"],
-                    "satuan":      vals["satuan"],
-                    "tanggal":     tgl_opname.isoformat(),
-                    "pencatat":    pencatat,
-                    "catatan":     catatan or None,
-                }
-                for bahan, vals in opname_inputs.items()
-                if vals["nilai"] > 0
-            ]
-            if rows_to_save:
-                if supabase_inv:
-                    try:
-                        supabase_inv.table("stock_opname").insert(rows_to_save).execute()
-                        st.success(f"Opname {len(rows_to_save)} bahan tersimpan.")
-                    except Exception as e:
-                        st.error(f"Gagal simpan opname: {e}")
-                else:
-                    existing = st.session_state.get("opname_local", [])
-                    existing.extend(rows_to_save)
-                    st.session_state["opname_local"] = existing
-                    st.success(f"Opname {len(rows_to_save)} bahan tersimpan (mode lokal).")
-            else:
-                st.warning("Tidak ada bahan yang diisi. Isi minimal satu nilai > 0.")
-
-        # Riwayat opname
         st.divider()
         st.markdown("**Riwayat Opname Terakhir**")
         opname_hist = []
@@ -1085,8 +1059,9 @@ def page_stock_tracker(supabase_inv, cabang: str):
                 pass
         else:
             opname_hist = sorted(
-                [r for r in st.session_state.get("opname_local", []) if r.get("cabang") == cabang],
-                key=lambda x: x["tanggal"], reverse=True
+                [r for r in st.session_state.get("opname_local", [])
+                 if r.get("cabang") == cabang],
+                key=lambda x: x.get("tanggal",""), reverse=True
             )[:50]
 
         if opname_hist:
@@ -1094,114 +1069,133 @@ def page_stock_tracker(supabase_inv, cabang: str):
         else:
             st.info("Belum ada riwayat opname.")
 
-    # ── TAB 4: MAPPING PRODUK ─────────────────────────────────────────────────
+    # ══════════════════════════════════════════════════════════════════════════
+    # TAB 4 — MAPPING PRODUK
+    # ══════════════════════════════════════════════════════════════════════════
     with tab_mapping:
         st.subheader("Mapping Produk POS ke Bahan Baku")
         st.caption(
-            "Tabel ini menghubungkan setiap menu di POS dengan bahan baku yang terlibat. "
-            "Sudah diisi otomatis — manager dapat menambah, mengubah, atau menonaktifkan baris."
+            "Menghubungkan menu POS dengan bahan baku. "
+            "Sudah diisi otomatis — manager dapat menambah atau menonaktifkan baris."
         )
 
-        # Tampilkan mapping saat ini
-        current_mapping = get_mapping(supabase_inv, cabang)
-        mapping_rows = []
-        for pid, bahans in current_mapping.items():
-            # Cari nama produk
-            prod_name = next((r["product_name"] for r in INITIAL_MAPPING
-                              if r["product_id"] == pid and r["branch"] == cabang), pid[:8])
-            for b in bahans:
-                mapping_rows.append({"Product ID": pid[:8], "Nama Produk": prod_name, "Bahan Baku": b})
+        # Tampilkan mapping — tidak ada variabel form di sini
+        _mapping = get_mapping(supabase_inv, cabang)
+        _map_rows = []
+        for _pid, _bahans in _mapping.items():
+            _pname = next(
+                (r["product_name"] for r in INITIAL_MAPPING
+                 if r["product_id"] == _pid and r["branch"] == cabang),
+                _pid[:8]
+            )
+            for _b in _bahans:
+                _map_rows.append({"Product ID": _pid[:8],
+                                  "Nama Produk": _pname,
+                                  "Bahan Baku": _b})
 
-        if mapping_rows:
-            df_map = pd.DataFrame(mapping_rows)
-            st.dataframe(df_map, use_container_width=True, hide_index=True)
-            st.caption(f"{len(mapping_rows)} baris mapping aktif untuk cabang {cabang}")
+        if _map_rows:
+            st.dataframe(pd.DataFrame(_map_rows), use_container_width=True, hide_index=True)
+            st.caption(f"{len(_map_rows)} baris mapping aktif untuk cabang {cabang}")
+        else:
+            st.info("Mapping kosong. Tambahkan di form di bawah.")
 
         st.divider()
         st.markdown("**Tambah Mapping Baru**")
-        with st.form("form_mapping"):
-            mc1, mc2, mc3 = st.columns(3)
-            with mc1:
-                new_pid   = st.text_input("Product ID (UUID dari POS)")
-            with mc2:
-                new_pname = st.text_input("Nama Produk")
-            with mc3:
-                new_bahan = st.text_input("Nama Bahan Baku (harus sama persis dengan inventaris)")
-            save_map = st.form_submit_button("Tambah Mapping")
 
-        if save_map and new_pid and new_bahan:
-            row = {
-                "product_id": new_pid.strip(),
-                "product_name": new_pname.strip(),
-                "branch": cabang,
-                "bahan_baku": new_bahan.strip(),
-                "active": True,
-            }
-            if supabase_inv:
-                try:
-                    supabase_inv.table("product_ingredient_groups").insert([row]).execute()
-                    st.success("Mapping berhasil ditambahkan.")
-                    st.rerun()
-                except Exception as e:
-                    st.error(f"Gagal: {e}")
-            else:
-                INITIAL_MAPPING.append({**row})
-                st.success("Mapping ditambahkan (mode lokal, tidak persisten).")
+        # SEMUA logika di DALAM with st.form
+        with st.form("form_mapping", clear_on_submit=True):
+            _mc1, _mc2, _mc3 = st.columns(3)
+            with _mc1:
+                _new_pid   = st.text_input("Product ID (UUID dari POS)",
+                                           placeholder="f2747fa1-...")
+            with _mc2:
+                _new_pname = st.text_input("Nama Produk",
+                                           placeholder="Kopi Susu Gula Aren")
+            with _mc3:
+                _new_bahan = st.text_input("Nama Bahan Baku",
+                                           placeholder="Sama persis dengan nama di inventaris")
+            _save_map = st.form_submit_button("Tambah Mapping", type="primary")
 
-    # ── TAB 5: KONFIGURASI REORDER ────────────────────────────────────────────
+            if _save_map:
+                if not _new_pid.strip() or not _new_bahan.strip():
+                    st.warning("Product ID dan Nama Bahan Baku wajib diisi.")
+                else:
+                    _row = {"product_id": _new_pid.strip(),
+                            "product_name": _new_pname.strip(),
+                            "branch": cabang,
+                            "bahan_baku": _new_bahan.strip(),
+                            "active": True}
+                    if supabase_inv:
+                        try:
+                            supabase_inv.table("product_ingredient_groups").insert([_row]).execute()
+                            st.success("Mapping berhasil ditambahkan.")
+                            st.rerun()
+                        except Exception as _e:
+                            st.error(f"Gagal: {_e}")
+                    else:
+                        INITIAL_MAPPING.append(_row)
+                        st.success("Ditambahkan ke sesi ini (tidak persisten).")
+
+    # ══════════════════════════════════════════════════════════════════════════
+    # TAB 5 — KONFIGURASI REORDER
+    # ══════════════════════════════════════════════════════════════════════════
     with tab_config:
         st.subheader("Konfigurasi Reorder Point per Bahan")
         st.caption(
-            "Atur lead time supplier dan safety stock untuk setiap bahan baku. "
+            "Atur lead time supplier dan safety stock. "
             "Semakin akurat nilainya, semakin tepat alert reorder."
         )
 
-        # Ambil config saat ini
-        cfg_rows = []
+        _cfg_rows = []
         if supabase_inv:
             try:
-                res = (supabase_inv.table("reorder_config")
-                       .select("*")
-                       .eq("cabang", cabang)
-                       .execute())
-                cfg_rows = res.data or []
+                _res = (supabase_inv.table("reorder_config")
+                        .select("*")
+                        .eq("cabang", cabang)
+                        .execute())
+                _cfg_rows = _res.data or []
             except Exception:
                 pass
 
-        if cfg_rows:
-            df_cfg = pd.DataFrame(cfg_rows)[["nama_barang", "lead_time_hari", "safety_stock", "satuan"]]
-            st.dataframe(df_cfg, use_container_width=True, hide_index=True)
+        if _cfg_rows:
+            _df_cfg = pd.DataFrame(_cfg_rows)
+            _show_cfg = [c for c in ["nama_barang","lead_time_hari","safety_stock","satuan"]
+                         if c in _df_cfg.columns]
+            st.dataframe(_df_cfg[_show_cfg], use_container_width=True, hide_index=True)
 
         st.divider()
         st.markdown("**Tambah / Ubah Konfigurasi**")
-        with st.form("form_reorder_cfg"):
-            rc1, rc2, rc3, rc4 = st.columns(4)
-            with rc1:
-                rc_bahan = st.text_input("Nama Bahan Baku")
-            with rc2:
-                rc_lead  = st.number_input("Lead Time (hari)", min_value=1, value=2)
-            with rc3:
-                rc_safety= st.number_input("Safety Stock", min_value=0.0, step=0.5)
-            with rc4:
-                rc_satuan= st.text_input("Satuan", placeholder="liter, pack, kg...")
-            save_cfg = st.form_submit_button("Simpan Konfigurasi")
 
-        if save_cfg and rc_bahan:
-            cfg_row = {
-                "nama_barang":    rc_bahan.strip(),
-                "cabang":         cabang,
-                "lead_time_hari": int(rc_lead),
-                "safety_stock":   float(rc_safety),
-                "satuan":         rc_satuan.strip() or None,
-            }
-            if supabase_inv:
-                try:
-                    supabase_inv.table("reorder_config").upsert(
-                        [cfg_row], on_conflict="nama_barang,cabang"
-                    ).execute()
-                    st.success("Konfigurasi tersimpan.")
-                    st.rerun()
-                except Exception as e:
-                    st.error(f"Gagal: {e}")
-            else:
-                st.info("Mode lokal — konfigurasi tidak persisten.")
+        # SEMUA logika di DALAM with st.form
+        with st.form("form_reorder_cfg", clear_on_submit=True):
+            _rc1, _rc2, _rc3, _rc4 = st.columns(4)
+            with _rc1:
+                _rc_bahan  = st.text_input("Nama Bahan Baku",
+                                           placeholder="Susu Full Cream")
+            with _rc2:
+                _rc_lead   = st.number_input("Lead Time (hari)", min_value=1, value=2)
+            with _rc3:
+                _rc_safety = st.number_input("Safety Stock", min_value=0.0, step=0.5)
+            with _rc4:
+                _rc_satuan = st.text_input("Satuan", placeholder="liter, pack, kg")
+            _save_cfg = st.form_submit_button("Simpan Konfigurasi", type="primary")
+
+            if _save_cfg:
+                if not _rc_bahan.strip():
+                    st.warning("Nama Bahan Baku wajib diisi.")
+                else:
+                    _cfg = {"nama_barang": _rc_bahan.strip(), "cabang": cabang,
+                            "lead_time_hari": int(_rc_lead),
+                            "safety_stock": float(_rc_safety),
+                            "satuan": _rc_satuan.strip() or None}
+                    if supabase_inv:
+                        try:
+                            supabase_inv.table("reorder_config").upsert(
+                                [_cfg], on_conflict="nama_barang,cabang"
+                            ).execute()
+                            st.success("Konfigurasi tersimpan.")
+                            st.rerun()
+                        except Exception as _e:
+                            st.error(f"Gagal: {_e}")
+                    else:
+                        st.info("Mode lokal — tidak persisten ke database.")
