@@ -43,6 +43,104 @@ def init_supabase():
 
 supabase = init_supabase()
 
+# ─── CAMERA HELPER ─────────────────────────────────────────────────────────────
+def _inject_camera_facing(widget_key: str, facing: str = "environment"):
+    """
+    Inject JavaScript yang meng-override facingMode kamera sebelum
+    st.camera_input mengakses getUserMedia.
+    
+    facing: "environment" = kamera belakang (default)
+             "user"        = kamera depan
+    """
+    st.markdown(
+        f"""
+        <script>
+        (function() {{
+            // Patch getUserMedia agar pakai facingMode yang kita tentukan
+            // Dijalankan setiap kali komponen ini muncul di DOM
+            var _origGUM = navigator.mediaDevices.getUserMedia.bind(navigator.mediaDevices);
+            navigator.mediaDevices.getUserMedia = function(constraints) {{
+                if (constraints && constraints.video) {{
+                    if (typeof constraints.video === "object") {{
+                        constraints.video.facingMode = "{facing}";
+                    }} else {{
+                        constraints.video = {{ facingMode: "{facing}" }};
+                    }}
+                }}
+                return _origGUM(constraints);
+            }};
+
+            // Juga stop semua stream aktif agar kamera restart dengan mode baru
+            if (window._activeCamStream_{widget_key}) {{
+                window._activeCamStream_{widget_key}.getTracks().forEach(function(t) {{
+                    t.stop();
+                }});
+                window._activeCamStream_{widget_key} = null;
+            }}
+
+            // Monitor stream baru yang dibuka Streamlit
+            var _origGUM2 = navigator.mediaDevices.getUserMedia.bind(navigator.mediaDevices);
+            navigator.mediaDevices.getUserMedia = function(c) {{
+                return _origGUM2(c).then(function(stream) {{
+                    window._activeCamStream_{widget_key} = stream;
+                    return stream;
+                }});
+            }};
+        }})();
+        </script>
+        """,
+        unsafe_allow_html=True,
+    )
+
+def camera_input_with_flip(label: str, widget_key: str):
+    """
+    Wrapper st.camera_input yang menambahkan tombol flip kamera depan/belakang.
+    
+    Cara kerja:
+    1. Simpan preferensi facing ("environment"/"user") di session_state
+    2. Inject JS yang patch getUserMedia dengan facingMode yang dipilih
+    3. Render st.camera_input — kamera terbuka dengan facingMode yang di-patch
+    4. Tombol flip mengubah state, trigger rerun → kamera restart dengan mode baru
+    
+    Return: UploadedFile | None (sama seperti st.camera_input)
+    """
+    face_key = f"{widget_key}_facing"
+
+    # Default: kamera belakang (environment) — cocok untuk foto nota/invoice
+    if face_key not in st.session_state:
+        st.session_state[face_key] = "environment"
+
+    facing = st.session_state[face_key]
+    is_rear = facing == "environment"
+
+    # Inject JS patch SEBELUM camera_input dirender
+    _inject_camera_facing(widget_key, facing)
+
+    # Toolbar: label + tombol flip
+    col_lbl, col_flip = st.columns([5, 2])
+    with col_lbl:
+        st.caption(
+            f"{label}  ·  "
+            f"{'📷 Kamera Belakang' if is_rear else '🤳 Kamera Depan'}"
+        )
+    with col_flip:
+        flip_text = "🔄 Kamera Depan" if is_rear else "🔄 Kamera Belakang"
+        if st.button(flip_text, key=f"{widget_key}_flip_btn",
+                     use_container_width=True):
+            st.session_state[face_key] = "user" if is_rear else "environment"
+            # Hapus capture lama saat flip
+            if widget_key in st.session_state:
+                del st.session_state[widget_key]
+            st.rerun()
+
+    # Kamera utama
+    return st.camera_input(
+        label,
+        key=widget_key,
+        label_visibility="collapsed",
+    )
+
+
 # ─── CUSTOM CSS ──────────────────────────────────────────────────────────────────
 # Tema monokrom: putih bersih + aksen biru #4f46e5, tanpa warna-warni berlebihan.
 BRAND   = "#4f46e5"   # Indigo utama
@@ -1196,9 +1294,9 @@ def _render_reupload_widget(row_id, old_fname: str | None, key_prefix: str):
                 _simpan_foto(fbytes, fname_new, mime, old_fname)
 
     else:  # Kamera
-        cam = st.camera_input(
-            "Arahkan kamera ke nota lalu Capture",
-            key=f"reupload_cam_{key_prefix}",
+        cam = camera_input_with_flip(
+            "Arahkan kamera ke nota",
+            f"reupload_cam_{key_prefix}",
         )
         if cam is not None:
             fbytes    = cam.getvalue()
@@ -1623,7 +1721,7 @@ def render_foto_invoice():
             if st.button("Ganti", key="btn_clear_foto", use_container_width=True):
                 st.session_state["foto_invoice_data"] = None
                 # Reset widget keys agar uploader/kamera muncul bersih
-                for k in ["s1_uploader", "s1_kamera"]:
+                for k in ["s1_uploader", "s1_kamera", "s1_kamera_facing"]:
                     if k in st.session_state:
                         del st.session_state[k]
                 st.rerun()
@@ -1665,9 +1763,9 @@ def render_foto_invoice():
 
     # ── Mode: Kamera langsung ─────────────────────────────────────────────────
     else:
-        foto = st.camera_input(
-            "Arahkan kamera ke nota lalu tekan Capture",
-            key="s1_kamera",
+        foto = camera_input_with_flip(
+            "Arahkan kamera ke nota",
+            "s1_kamera",
         )
         if foto is not None:
             file_bytes = foto.getvalue()
