@@ -1272,11 +1272,40 @@ def show_login():
         # Spacer atas
         st.markdown("<div style='height:6vh'></div>", unsafe_allow_html=True)
 
-        # Tag kecil uppercase
+        # Tag sistem + jam real-time via JS (sinkron jam device)
         st.markdown(
-            "<p style='font-size:0.68rem;font-weight:700;letter-spacing:0.2em;"
-            "text-transform:uppercase;color:#a5b4fc;margin:0 0 1.2rem;'>"
-            "Sistem Inventaris Kafe</p>",
+            """
+            <div style='margin-bottom:1.4rem;'>
+                <p style='font-size:0.68rem;font-weight:700;letter-spacing:0.2em;
+                          text-transform:uppercase;color:#a5b4fc;margin:0 0 5px;'>
+                    Sistem Inventaris Kafe
+                </p>
+                <div id="login-clock"
+                     style='font-size:0.82rem;color:rgba(199,210,254,0.85);
+                            font-weight:500;letter-spacing:0.01em;min-height:1.2em;'>
+                    &nbsp;
+                </div>
+            </div>
+            <script>
+            (function(){
+                var DAYS=['Sunday','Monday','Tuesday','Wednesday',
+                          'Thursday','Friday','Saturday'];
+                var MON =['January','February','March','April','May','June',
+                          'July','August','September','October','November','December'];
+                function pad(n){return n<10?'0'+n:''+n;}
+                function tick(){
+                    var d=new Date();
+                    var s=DAYS[d.getDay()]+', '
+                         +pad(d.getDate())+' '+MON[d.getMonth()]+' '+d.getFullYear()
+                         +' · '+pad(d.getHours())+':'+pad(d.getMinutes())+':'+pad(d.getSeconds());
+                    var el=document.getElementById('login-clock');
+                    if(el) el.textContent=s;
+                }
+                tick();
+                setInterval(tick,1000);
+            })();
+            </script>
+            """,
             unsafe_allow_html=True,
         )
 
@@ -2237,8 +2266,16 @@ def page_administrasi(df: pd.DataFrame):
         c1a, c1b, c1c = st.columns(3)
         with c1a:
             st.date_input("Tanggal Transaksi *", value=date.today(), key="s1_tgl")
-            st.time_input("Jam Transaksi *", value=datetime.now().time(), key="s1_jam",
-                          help="Jam saat transaksi terjadi; dicatat di database dan nama file bukti.")
+            # Input jam manual — format HH:MM, default jam sistem sekarang
+            _default_jam = datetime.now().strftime("%H:%M")
+            st.text_input(
+                "Jam Transaksi *",
+                value=_default_jam,
+                key="s1_jam",
+                placeholder="Contoh: 18:00",
+                help="Format 24 jam: HH:MM — otomatis terisi jam sekarang, bisa diubah manual.",
+                max_chars=5,
+            )
         with c1b:
             st.text_input("Nomor Nota / Invoice", placeholder="Contoh: INV-001", key="s1_nota")
             st.text_input("Nama Supplier *",
@@ -2497,7 +2534,7 @@ def page_administrasi(df: pd.DataFrame):
             pencatat_val = st.session_state.get("s1_pencatat", "").strip()
             nota_val     = st.session_state.get("s1_nota",     "").strip()
             tgl_val      = st.session_state.get("s1_tgl",      date.today())
-            jam_val      = st.session_state.get("s1_jam",      datetime.now().time())
+            jam_val      = st.session_state.get("s1_jam", datetime.now().strftime("%H:%M"))
             kat_val      = st.session_state.get("s2_kategori", KATEGORI_OPTIONS[0])
             sub_val      = st.session_state.get("s2_sub",      "")
             nama_val     = _get_s2_nama()
@@ -2514,7 +2551,9 @@ def page_administrasi(df: pd.DataFrame):
             if errors:
                 st.error("Harap lengkapi: " + " · ".join(errors))
             else:
-                jam_str = jam_val.strftime("%H:%M:%S") if hasattr(jam_val, "strftime") else str(jam_val)
+                # Normalisasi jam string "HH:MM" → "HH:MM:SS"
+                _jam_raw = str(jam_val).strip()
+                jam_str  = (_jam_raw + ":00") if len(_jam_raw) == 5 else _jam_raw
                 item_baru = {
                     "cabang":            st.session_state.cabang,
                     "tanggal":           tgl_val.isoformat(),
@@ -2548,7 +2587,7 @@ def page_administrasi(df: pd.DataFrame):
             pencatat_val = st.session_state.get("s1_pencatat", "").strip()
             nota_val     = st.session_state.get("s1_nota",     "").strip()
             tgl_val      = st.session_state.get("s1_tgl",      date.today())
-            jam_val      = st.session_state.get("s1_jam",      datetime.now().time())
+            jam_val      = st.session_state.get("s1_jam", datetime.now().strftime("%H:%M"))
             kat_val      = st.session_state.get("s2_kategori", KATEGORI_OPTIONS[0])
             sub_val      = st.session_state.get("s2_sub",      "")
             nama_val     = _get_s2_nama()
@@ -2566,7 +2605,9 @@ def page_administrasi(df: pd.DataFrame):
             if errors:
                 st.error("Harap lengkapi: " + " · ".join(errors))
             else:
-                jam_str = jam_val.strftime("%H:%M:%S") if hasattr(jam_val, "strftime") else str(jam_val)
+                # Normalisasi jam string "HH:MM" → "HH:MM:SS"
+                _jam_raw = str(jam_val).strip()
+                jam_str  = (_jam_raw + ":00") if len(_jam_raw) == 5 else _jam_raw
                 ok = insert_row({
                     "cabang":            st.session_state.cabang,
                     "tanggal":           tgl_val.isoformat(),
