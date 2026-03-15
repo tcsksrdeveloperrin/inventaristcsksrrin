@@ -9,6 +9,19 @@ try:
 except ImportError:
     STOCK_ENGINE_AVAILABLE = False
 
+# ─── TIMEZONE WIB (UTC+7) ────────────────────────────────────────────────────
+# Streamlit Cloud berjalan di UTC. Semua tampilan waktu harus dikonversi ke WIB.
+from datetime import timezone, timedelta as _td
+_WIB = timezone(_td(hours=7))
+
+def now_wib() -> datetime:
+    """Kembalikan datetime sekarang dalam timezone WIB (UTC+7)."""
+    return datetime.now(timezone.utc).astimezone(_WIB)
+
+def today_wib():
+    """Kembalikan date hari ini dalam WIB."""
+    return now_wib().date()
+
 # ─── PAGE CONFIG ─────────────────────────────────────────────────────────────────
 st.set_page_config(
     page_title="Inventaris Kafe",
@@ -1700,21 +1713,54 @@ def page_dashboard(df: pd.DataFrame, cabang_label: str = None):
     import numpy as np
 
     cabang  = cabang_label or st.session_state.cabang
-    now_str = datetime.now().strftime("%A, %d %B %Y · %H:%M")
     st.title("Dashboard Inventaris")
-    st.caption(f"Cabang **{cabang}** · {now_str}")
+    # Jam mengikuti device client via JavaScript — tidak bergantung timezone server
+    st.markdown(
+        f"""
+        <div style='font-size:0.85rem;color:#64748b;margin:-0.5rem 0 1rem;'>
+            Cabang <b>{cabang}</b>
+            &nbsp;&middot;&nbsp;
+            <span id='dash-clock' style='font-variant-numeric:tabular-nums;'></span>
+        </div>
+        <script>
+        (function(){{
+            var DAYS=['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
+            var MON=['January','February','March','April','May','June',
+                     'July','August','September','October','November','December'];
+            function pad(n){{return n<10?'0'+n:''+n;}}
+            function tick(){{
+                var d=new Date();
+                var s=DAYS[d.getDay()]+', '+pad(d.getDate())+' '
+                     +MON[d.getMonth()]+' '+d.getFullYear()
+                     +' · '+pad(d.getHours())+':'+pad(d.getMinutes())+':'+pad(d.getSeconds());
+                var el=document.getElementById('dash-clock');
+                if(el) el.textContent=s;
+            }}
+            tick(); setInterval(tick,1000);
+        }})();
+        </script>
+        """,
+        unsafe_allow_html=True,
+    )
 
     # ── Auto-sync POS di background saat dashboard dibuka ──────────────────
-    if STOCK_ENGINE_AVAILABLE and not st.session_state.get("_pos_synced_this_session"):
+    # Flag per-cabang agar sync tidak berulang dalam 5 menit (throttle)
+    _sync_flag = f"_pos_synced_{cabang}"
+    _sync_ts   = f"_pos_synced_ts_{cabang}"
+    _now_ts    = datetime.now().timestamp()
+    _last_ts   = st.session_state.get(_sync_ts, 0)
+    _throttle_secs = 300  # 5 menit
+
+    if STOCK_ENGINE_AVAILABLE and (_now_ts - _last_ts) > _throttle_secs:
         try:
             _sync_result = sync_pos_to_inventory(supabase, cabang)
-            if _sync_result["synced"] > 0:
+            st.session_state[_sync_flag] = True
+            st.session_state[_sync_ts]   = _now_ts
+            if _sync_result.get("synced", 0) > 0:
                 st.toast(
-                    f"Sinkronisasi POS: {_sync_result['synced']} entri baru "
-                    f"dari {_sync_result['new_trx']} transaksi.",
-                    icon="🔄"
+                    f"POS: {_sync_result['new_trx']} transaksi baru disinkronkan.",
+                    icon="✓"
                 )
-            st.session_state["_pos_synced_this_session"] = True
         except Exception:
             pass  # Gagal sync tidak boleh break dashboard
 
@@ -2289,7 +2335,7 @@ def page_administrasi(df: pd.DataFrame):
         with c1a:
             st.date_input("Tanggal Transaksi *", value=date.today(), key="s1_tgl")
             # Input jam manual — format HH:MM, default jam sistem sekarang
-            _default_jam = datetime.now().strftime("%H:%M")
+            _default_jam = now_wib().strftime("%H:%M")
             st.text_input(
                 "Jam Transaksi *",
                 value=_default_jam,
@@ -3115,7 +3161,7 @@ def page_administrasi(df: pd.DataFrame):
 def page_kontrol_audit(df: pd.DataFrame):
     import numpy as np
     st.title("Kontrol & Audit")
-    st.caption(f"Cabang **{st.session_state.cabang}** · {datetime.now().strftime('%d %b %Y, %H:%M')}")
+    st.caption(f"Cabang **{st.session_state.cabang}** · {now_wib().strftime('%d %b %Y, %H:%M')}")
 
     if df.empty:
         empty_state("Belum Ada Data untuk Diaudit",
@@ -3417,7 +3463,7 @@ def page_kontrol_audit(df: pd.DataFrame):
 def page_manager_pusat_overview(data: dict):
     import numpy as np
     st.title("Dashboard Manager Pusat")
-    st.caption(f"Pemantauan Lintas Cabang · {datetime.now().strftime('%d %b %Y, %H:%M')}")
+    st.caption(f"Pemantauan Lintas Cabang · {now_wib().strftime('%d %b %Y, %H:%M')}")
 
     ALL_CABANG = ["WKA", "Buper"]
     today = pd.Timestamp.today().normalize()
@@ -3521,7 +3567,7 @@ def page_manager_pusat_overview(data: dict):
 def page_perbandingan_cabang(data: dict):
     import numpy as np
     st.title("Perbandingan Performa Cabang")
-    st.caption(f"WKA vs Buper · {datetime.now().strftime('%d %b %Y, %H:%M')}")
+    st.caption(f"WKA vs Buper · {now_wib().strftime('%d %b %Y, %H:%M')}")
 
     ALL_CABANG = ["WKA", "Buper"]
     today = pd.Timestamp.today().normalize()
