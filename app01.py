@@ -43,104 +43,6 @@ def init_supabase():
 
 supabase = init_supabase()
 
-# ─── CAMERA HELPER ─────────────────────────────────────────────────────────────
-def _inject_camera_facing(widget_key: str, facing: str = "environment"):
-    """
-    Inject JavaScript yang meng-override facingMode kamera sebelum
-    st.camera_input mengakses getUserMedia.
-    
-    facing: "environment" = kamera belakang (default)
-             "user"        = kamera depan
-    """
-    st.markdown(
-        f"""
-        <script>
-        (function() {{
-            // Patch getUserMedia agar pakai facingMode yang kita tentukan
-            // Dijalankan setiap kali komponen ini muncul di DOM
-            var _origGUM = navigator.mediaDevices.getUserMedia.bind(navigator.mediaDevices);
-            navigator.mediaDevices.getUserMedia = function(constraints) {{
-                if (constraints && constraints.video) {{
-                    if (typeof constraints.video === "object") {{
-                        constraints.video.facingMode = "{facing}";
-                    }} else {{
-                        constraints.video = {{ facingMode: "{facing}" }};
-                    }}
-                }}
-                return _origGUM(constraints);
-            }};
-
-            // Juga stop semua stream aktif agar kamera restart dengan mode baru
-            if (window._activeCamStream_{widget_key}) {{
-                window._activeCamStream_{widget_key}.getTracks().forEach(function(t) {{
-                    t.stop();
-                }});
-                window._activeCamStream_{widget_key} = null;
-            }}
-
-            // Monitor stream baru yang dibuka Streamlit
-            var _origGUM2 = navigator.mediaDevices.getUserMedia.bind(navigator.mediaDevices);
-            navigator.mediaDevices.getUserMedia = function(c) {{
-                return _origGUM2(c).then(function(stream) {{
-                    window._activeCamStream_{widget_key} = stream;
-                    return stream;
-                }});
-            }};
-        }})();
-        </script>
-        """,
-        unsafe_allow_html=True,
-    )
-
-def camera_input_with_flip(label: str, widget_key: str):
-    """
-    Wrapper st.camera_input yang menambahkan tombol flip kamera depan/belakang.
-    
-    Cara kerja:
-    1. Simpan preferensi facing ("environment"/"user") di session_state
-    2. Inject JS yang patch getUserMedia dengan facingMode yang dipilih
-    3. Render st.camera_input — kamera terbuka dengan facingMode yang di-patch
-    4. Tombol flip mengubah state, trigger rerun → kamera restart dengan mode baru
-    
-    Return: UploadedFile | None (sama seperti st.camera_input)
-    """
-    face_key = f"{widget_key}_facing"
-
-    # Default: kamera belakang (environment) — cocok untuk foto nota/invoice
-    if face_key not in st.session_state:
-        st.session_state[face_key] = "environment"
-
-    facing = st.session_state[face_key]
-    is_rear = facing == "environment"
-
-    # Inject JS patch SEBELUM camera_input dirender
-    _inject_camera_facing(widget_key, facing)
-
-    # Toolbar: label + tombol flip
-    col_lbl, col_flip = st.columns([5, 2])
-    with col_lbl:
-        st.caption(
-            f"{label}  ·  "
-            f"{'📷 Kamera Belakang' if is_rear else '🤳 Kamera Depan'}"
-        )
-    with col_flip:
-        flip_text = "🔄 Kamera Depan" if is_rear else "🔄 Kamera Belakang"
-        if st.button(flip_text, key=f"{widget_key}_flip_btn",
-                     use_container_width=True):
-            st.session_state[face_key] = "user" if is_rear else "environment"
-            # Hapus capture lama saat flip
-            if widget_key in st.session_state:
-                del st.session_state[widget_key]
-            st.rerun()
-
-    # Kamera utama
-    return st.camera_input(
-        label,
-        key=widget_key,
-        label_visibility="collapsed",
-    )
-
-
 # ─── CUSTOM CSS ──────────────────────────────────────────────────────────────────
 # Tema monokrom: putih bersih + aksen biru #4f46e5, tanpa warna-warni berlebihan.
 BRAND   = "#4f46e5"   # Indigo utama
@@ -1293,13 +1195,12 @@ def _render_reupload_widget(row_id, old_fname: str | None, key_prefix: str):
                          type="primary", use_container_width=True):
                 _simpan_foto(fbytes, fname_new, mime, old_fname)
 
-    else:  # Kamera
-        cam = camera_input_with_flip(
-            "Arahkan kamera ke nota",
-            f"reupload_cam_{key_prefix}",
+    else:  # Kamera (dengan flip depan/belakang)
+        fbytes = camera_with_flip(
+            "Arahkan kamera ke nota lalu Capture",
+            key=f"reupload_cam_{key_prefix}",
         )
-        if cam is not None:
-            fbytes    = cam.getvalue()
+        if fbytes is not None:
             fname_new, _ = _build_fname_reupload("jpg")
             st.image(fbytes, use_container_width=True)
             if st.button("Simpan Foto Baru", key=f"simpan_reupload_cam_{key_prefix}",
@@ -1655,6 +1556,97 @@ def _get_s2_grind() -> str:
     return "-"
 
 # ─── HELPER: FOTO / FILE INVOICE ────────────────────────────────────────────────
+# ─── HELPER: KAMERA DENGAN FLIP DEPAN/BELAKANG ──────────────────────────────────
+def camera_with_flip(label: str, key: str) -> "bytes | None":
+    """
+    Kamera dengan tombol flip depan (selfie) ↔ belakang (nota/dokumen).
+
+    Cara kerja:
+    - Saat tombol flip ditekan, facing state berubah dan widget key berubah
+      (key menyertakan facing: "s1_kamera__env" vs "s1_kamera__user")
+    - Key berbeda = Streamlit render widget kamera BARU dari nol
+    - Sebelum widget mount, inject JS yang override getUserMedia agar
+      browser membuka kamera sesuai facingMode yang dipilih
+    - Ini cara yang works di semua versi Streamlit tanpa parameter tambahan
+    """
+    _facing_key = f"_flip_facing_{key}"
+    if _facing_key not in st.session_state:
+        st.session_state[_facing_key] = "environment"  # default: kamera belakang
+
+    _facing  = st.session_state[_facing_key]
+    _is_back = (_facing == "environment")
+
+    # ── Inject JS override getUserMedia SEBELUM widget render ────────────────
+    # Override ini memastikan saat Streamlit mount <video> element dan panggil
+    # getUserMedia, browser sudah tahu harus pakai facingMode yang kita mau.
+    st.markdown(f"""
+    <script>
+    (function() {{
+        // Simpan getUserMedia asli
+        var _origGUM = navigator.mediaDevices.getUserMedia.bind(navigator.mediaDevices);
+        // Override sementara dengan facingMode yang diminta
+        navigator.mediaDevices.getUserMedia = function(constraints) {{
+            if (constraints && constraints.video) {{
+                if (typeof constraints.video === 'object') {{
+                    constraints.video.facingMode = {{ ideal: '{_facing}' }};
+                }} else {{
+                    constraints.video = {{ facingMode: {{ ideal: '{_facing}' }} }};
+                }}
+            }}
+            return _origGUM(constraints);
+        }};
+        // Restore setelah 5 detik (setelah stream sudah terbuka)
+        setTimeout(function() {{
+            navigator.mediaDevices.getUserMedia = _origGUM;
+        }}, 5000);
+    }})();
+    </script>
+    """, unsafe_allow_html=True)
+
+    # Mirror CSS untuk kamera depan (preview tidak terbalik)
+    if not _is_back:
+        st.markdown("""
+        <style>
+        [data-testid="stCameraInput"] video {
+            transform: scaleX(-1) !important;
+        }
+        </style>
+        """, unsafe_allow_html=True)
+
+    # ── Toolbar: info kamera aktif + tombol flip ──────────────────────────────
+    _col_info, _col_btn = st.columns([3, 1])
+    with _col_info:
+        st.markdown(
+            f"<div style='font-size:0.78rem;color:#64748b;padding:6px 0'>"
+            f"{'📷 Kamera Belakang' if _is_back else '🤳 Kamera Depan'} aktif"
+            f"</div>",
+            unsafe_allow_html=True,
+        )
+    with _col_btn:
+        _flip_label = "🤳 Depan" if _is_back else "📷 Belakang"
+        if st.button(
+            _flip_label,
+            key=f"_btn_flip_{key}",
+            use_container_width=True,
+            help="Ganti ke kamera " + ("depan" if _is_back else "belakang"),
+        ):
+            # Ganti facing state
+            st.session_state[_facing_key] = "user" if _is_back else "environment"
+            # Hapus result widget lama agar tidak carry over foto sebelumnya
+            _old_wkey = f"{key}__{'env' if _is_back else 'usr'}"
+            if _old_wkey in st.session_state:
+                del st.session_state[_old_wkey]
+            st.rerun()
+
+    # ── Widget kamera — key unik per facing agar browser restart stream ───────
+    _widget_key = f"{key}__{'env' if _is_back else 'usr'}"
+    _foto = st.camera_input(
+        label,
+        key=_widget_key,
+        label_visibility="collapsed",
+    )
+    return _foto.getvalue() if _foto is not None else None
+
 def render_foto_invoice():
     """
     Lampiran bukti invoice — dua mode: unggah file atau kamera langsung.
@@ -1721,7 +1713,7 @@ def render_foto_invoice():
             if st.button("Ganti", key="btn_clear_foto", use_container_width=True):
                 st.session_state["foto_invoice_data"] = None
                 # Reset widget keys agar uploader/kamera muncul bersih
-                for k in ["s1_uploader", "s1_kamera", "s1_kamera_facing"]:
+                for k in ["s1_uploader", "s1_kamera"]:
                     if k in st.session_state:
                         del st.session_state[k]
                 st.rerun()
@@ -1761,14 +1753,13 @@ def render_foto_invoice():
             _upload_to_storage(file_bytes, fname, mime)
             return file_bytes, fname, now.strftime("%H:%M:%S")
 
-    # ── Mode: Kamera langsung ─────────────────────────────────────────────────
+    # ── Mode: Kamera langsung (dengan flip depan/belakang) ──────────────────
     else:
-        foto = camera_input_with_flip(
-            "Arahkan kamera ke nota",
-            "s1_kamera",
+        file_bytes = camera_with_flip(
+            "Arahkan kamera ke nota lalu tekan Capture",
+            key="s1_kamera",
         )
-        if foto is not None:
-            file_bytes = foto.getvalue()
+        if file_bytes is not None:
             fname, now = _build_filename("jpg")
 
             # Simpan ke session_state agar tahan rerun
